@@ -1,265 +1,286 @@
-# FlowSync — Persistent Memory for AI Coding Agents
+# CodeAtlas --- Engineering Intelligence Platform
 
-> *Give your AI agent project-wide context it never forgets.*
+> Connect engineering history, technical decisions, and development
+> workflows into searchable context for developers and AI coding
+> assistants.
 
-> **AI for Bharat Hackathon**
+CodeAtlas is an AI-powered engineering intelligence platform designed to
+help developers understand not only **what changed** in a codebase, but
+also **why it changed**. It combines developer tooling, cloud-based
+event processing, retrieval-augmented generation (RAG), and Model
+Context Protocol (MCP) integrations.
 
-> Team **Vanta** — Aahil Khan, Anoushka Awasthi, Maulik Dang, Sanyam Wadhwa
+The repository currently contains a foundation for persistent project
+context, an IDE extension, an MCP server, a web dashboard, and AWS
+serverless infrastructure. The roadmap describes planned improvements
+separately so implemented features are not confused with future work.
 
----
+## Why CodeAtlas?
 
-## 🧠 What is FlowSync?
+Engineering knowledge is often scattered across commits, pull requests,
+conversations, documentation, and individual developers' memories. This
+makes it difficult to recover decisions, investigate regressions, and
+provide AI assistants with reliable project context.
 
-FlowSync gives AI coding agents — GitHub Copilot, Cursor, Claude — **persistent project memory** via the Model Context Protocol (MCP).
+CodeAtlas aims to make that knowledge easier to capture, search, and
+connect.
 
-Your agent calls `log_context` to record *why* it made a decision, and `search_context` to recall what the team decided weeks ago. Five MCP tools turn your agent from a stateless autocomplete into a teammate that **remembers everything**.
+## Core Capabilities
 
-For developers who don't use an AI agent, FlowSync also auto-captures context from every `git push` as a built-in fallback.
+-   **Persistent project context** --- Store structured information
+    about engineering decisions, risks, tasks, and code changes.
+-   **AI-assisted retrieval** --- Ask natural-language questions about
+    available project context and retrieve relevant records.
+-   **Developer workflow integration** --- Use a VS Code extension to
+    connect the development workflow with the platform.
+-   **MCP integration** --- Expose project-context operations through
+    structured tools for compatible AI coding assistants.
+-   **Web dashboard** --- Explore project activity and context through a
+    browser-based interface.
+-   **Traceable answers** --- Link answers to available source records
+    where supported by the retrieval pipeline.
 
----
+> **Implementation status:** The current repository is an evolving
+> foundation. GitHub webhook ingestion, SQS-based processing, an
+> engineering knowledge graph, and CI/CD intelligence are roadmap items
+> until implemented and verified.
 
-## 🚨 The Problem
+## Architecture
 
-AI coding agents are powerful but **stateless** — they lose all project context between sessions. Traditional tools can't fix this:
+### Current foundation
 
-| Tool | Limitation |
-|------|------------|
-| **Git Logs** | Stores *what* changed, not *why* |
-| **Documentation** | Requires manual updates; goes stale quickly |
-| **AI Assistants** | No persistent memory across sessions |
-| **Chat history** | Fragmented, unsearchable, per-user |
-
----
-
-## ✅ How FlowSync Works
-
-### 1. 🤖 Agent Logs — *`log_context`*
-After completing a task, your AI agent calls `log_context` to record the decisions made, risks introduced, and reasoning — structured and searchable. This is FlowSync's **core value**: capturing the *why* behind code, not just the *what*.
-
-### 2. 🔍 Agent Searches — *`search_context`*
-Before starting work, your agent calls `search_context` with a natural-language question like *"what did we decide about auth?"* — and gets a grounded answer with source citations, powered by Titan Embeddings + Nova Pro RAG.
-
-### 3. 📡 Auto-Capture Fallback — *Git Push*
-For developers who don't use an AI agent, a post-push hook automatically sends diffs to **Amazon Bedrock (Nova Pro)** which extracts decisions, risks, tasks, and affected files. The project brain grows either way.
-
-### 👥 Team Visibility*
-Any team member can view the context timeline, chat with the project brain, or ask natural language questions from the web dashboard — no AI agent required.
-
----
-
-## ✨ Key Features
-
-- **`log_context` MCP Tool** — AI agent records decisions, risks, reasoning, and tasks after every unit of work
-- **`search_context` MCP Tool** — AI agent queries project history with natural language; gets grounded, citation-backed answers
-- **5 MCP Tools Total** — `get_project_context`, `get_recent_changes`, `search_context`, `log_context`, `get_events` — works with Copilot, Cursor, Claude
-- **Auto-Capture Fallback** — Every git push triggers AI extraction via Nova Pro; project brain grows even without an AI agent
-- **Strict Traceability & Source Citations** — Every AI insight is linked back to its originating commit or logged context, preventing hallucinations
-- **Team Dashboard** — Real-time timeline of decisions, risks, and tasks across all branches and contributors
-
----
-
-## 🏗️ Architecture
-
-```
-CLIENT LAYER                        BACKEND LAYER (AWS)
-─────────────────────────────────────────────────────────────────
-VS Code Extension (VSIX)            Amazon API Gateway
-  ├── Git push hook         ──►         ├── Ingestion (Lambda)
-  └── MCP Tool calls                    │     └── Validates, stores to DynamoDB
-                                        │         Invokes AI processing async
-                                        │
-MCP Server (stdio)       ◄──►           ├── AI Processing (Lambda + Nova Pro)
-  ├── get_project_context               │     └── Extracts context, embeddings,
-  ├── get_recent_changes                │         merge propagation
-  ├── search_context                    │
-  ├── log_context                       ├── MCP Handler (Lambda)
-  └── get_events                        │     └── Routes 5 MCP tool calls
-                                        │
-Web Dashboard (Next.js)  ◄──            ├── Query (Lambda + Nova Pro)
-  (hosted on S3 + CloudFront)             │     └── Natural language Q&A, RAG
-                                        │
-                                        └── Chat (Lambda + Nova Lite)
-                                              └── Conversational interface
-
-STORAGE
-  ├── flowsync-projects  — DynamoDB (project metadata + API tokens)
-  ├── flowsync-events    — DynamoDB (raw push events)
-  ├── flowsync-context   — DynamoDB (AI-extracted context + embeddings)
-  ├── flowsync-cache     — DynamoDB (RAG response cache, 1-hr TTL)
-  └── flowsync-raw-*     — S3 (raw event archive)
+``` text
+Developer / AI Coding Assistant
+        |             |
+   VS Code         MCP Client
+   Extension       / AI Agent
+        |             |
+        +------+------+
+               |
+        Amazon API Gateway
+               |
+        Ingestion Lambda
+          |          |
+      DynamoDB       S3
+          |
+   AI Processing Lambda
+          |
+     Amazon Bedrock
+          |
+  Context + Embeddings
+          |
+       DynamoDB
+          |
+   Query / Chat Lambdas
+          |
+     MCP + Dashboard
 ```
 
----
+This is a high-level overview of the existing design; consult the
+infrastructure code for exact resource configuration and execution
+paths.
 
-## 🔄 Process Flow
+### Planned event-driven evolution
 
+``` text
+GitHub Webhooks + VS Code
+             |
+        API Gateway
+             |
+       Ingestion Lambda
+             |
+          SQS Queue
+             |
+     AI Processing Lambda
+             |
+  Engineering Context + Retrieval
+             |
+       MCP + Dashboard
+
+Failures after retries --> Dead-Letter Queue
 ```
-1. Agent works on task  →  2. Agent calls log_context   →  3. Context stored in Project Brain
-        ↑                                                           ↓
-6. Team views dashboard   ←  5. RAG answers with citations  ←  4. Agent calls search_context
 
-                  ── Fallback: git push auto-captures diffs ──
+The queue, dead-letter handling, GitHub webhook ingestion, and related
+processing changes are planned milestones, not claims of a deployed
+implementation.
+
+## Technology Stack
+
+  Layer                            Technology
+  -------------------------------- -----------------------------------------------
+  IDE integration                  TypeScript, Node.js, VS Code Extension API
+  Frontend                         Next.js 14, React 18, Tailwind CSS, shadcn/ui
+  MCP server                       TypeScript, `@modelcontextprotocol/sdk`
+  API                              Amazon API Gateway
+  Serverless compute               AWS Lambda (Node.js and Python)
+  AI models                        Amazon Bedrock Nova Pro and Nova Lite
+  Embeddings                       Amazon Titan Text Embeddings
+  Data storage                     Amazon DynamoDB
+  Raw event archive                Amazon S3
+  Infrastructure as code           AWS CDK
+  Planned event processing         Amazon SQS and Dead-Letter Queue
+  Planned repository integration   GitHub App and webhooks
+  Planned CI/CD intelligence       GitHub Actions workflow events
+
+The planned technologies are included to communicate direction and do
+not imply that those integrations are already configured.
+
+## Development Roadmap
+
+  -----------------------------------------------------------------------
+  Phase                   Focus                   Goal
+  ----------------------- ----------------------- -----------------------
+  1                       Foundation and cleanup  Secure credentials,
+                                                  establish a reliable
+                                                  Git baseline, integrate
+                                                  shared contracts, align
+                                                  branding, and
+                                                  strengthen tests
+
+  2                       Reliable event          Add SQS, a DLQ,
+                          ingestion               retries, idempotency,
+                                                  and GitHub webhook
+                                                  ingestion
+
+  3                       Engineering knowledge   Connect repositories,
+                          graph                   commits, files, pull
+                                                  requests, and related
+                                                  engineering entities
+
+  4                       CI/CD intelligence      Associate workflow
+                                                  failures and deployment
+                                                  events with code
+                                                  changes
+
+  5                       Advanced AI and RAG     Improve retrieval,
+                                                  ranking, grounding, and
+                                                  source attribution
+
+  6                       MCP integration         Expand tools for
+                                                  AI-assisted engineering
+                                                  workflows
+
+  7                       Multi-tenancy and       Add organization
+                          security                isolation,
+                                                  authorization,
+                                                  role-based access, and
+                                                  audit controls
+
+  8                       Observability           Add tracing, metrics,
+                                                  alarms, and operational
+                                                  dashboards
+
+  9                       Testing and performance Validate integrations,
+                                                  recovery, retrieval
+                                                  quality, latency, and
+                                                  cost
+
+  10                      Deployment and          Improve CI/CD,
+                          portfolio polish        deployment
+                                                  documentation, demos,
+                                                  and project
+                                                  presentation
+  -----------------------------------------------------------------------
+
+**Current priority:** complete Phase 1 remediation before starting the
+SQS and DLQ work in Phase 2.
+
+## Repository Structure
+
+``` text
+CodeAtlas/
+├── extension/              # VS Code extension
+├── frontend/               # Next.js dashboard
+├── infra/                  # AWS CDK and Lambda infrastructure
+├── mcp-server/             # MCP server
+├── packages/
+│   └── flowsync-shared/    # Shared TypeScript contracts and utilities
+├── design/                 # Design assets
+├── DOCUMENTATION/          # Architecture and technical documentation
+├── .gitignore
+└── README.md
 ```
 
-**Key Actors:**
-- **AI Agent** — Primary user; logs decisions via `log_context`, queries via `search_context`
-- **Developer** — Codes normally; pushes trigger auto-capture as fallback
-- **Team Lead / Member** — Views dashboard, chats with project brain
+Some internal package and infrastructure identifiers retain the original
+`flowsync` naming to avoid unnecessary compatibility-breaking changes.
 
----
-
-## 🛠️ Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| IDE Extension | TypeScript / Node.js (VS Code) |
-| MCP Server | TypeScript, `@modelcontextprotocol/sdk`, stdio transport |
-| API & Security | Amazon API Gateway (TLS 1.3, Bearer tokens, rate limiting) |
-| Serverless Compute | AWS Lambda (Python 3.12) |
-| AI / LLM | Amazon Bedrock — Nova Pro (intent extraction), Nova Lite (chat/Q&A) |
-| Embeddings | Amazon Titan Text Embeddings v1 |
-| Database | Amazon DynamoDB |
-| Asset Storage | Amazon S3 |
-| Frontend Dashboard | Next.js 14, React 18, Tailwind CSS, shadcn/ui — hosted on AWS S3 + CloudFront |
-
----
-
-## 💰 Estimated Cost
-
-| Component | AWS Service | Monthly Cost |
-|-----------|-------------|--------------|
-| Intent Extraction | Amazon Bedrock (Nova Pro) | ~₹420 ($5.00) |
-| Chat & Q&A | Amazon Bedrock (Nova Lite) | ~₹85 ($1.00) |
-| Embeddings | Amazon Titan Embeddings | ~₹84 ($1.00) |
-| Compute | AWS Lambda | <₹170 ($2.00) |
-| Storage | Amazon DynamoDB | ~₹420 ($5.00) |
-| API & Network | Amazon API Gateway | ~₹265 ($3.15) |
-| **Total** | | **~₹1,400 ($17.00) / month** |
-
-> **~₹350 ($4.00) per developer per month** (4-person team)
-
-### Why it's cost-effective:
-- **Zero Idle Cost** — Serverless architecture means you pay ₹0 when the team isn't coding
-- **High ROI** — Saving just a couple of hours of confusion per month makes it pay for itself
-- **Linear Scalability** — Costs grow linearly with team activity, no sudden tier jumps
-
----
-
-## �️ Why This Architecture
-
-### DynamoDB over RDS
-FlowSync ingests unpredictable bursts of developer events — spiky, bursty, schema-light workloads that would thrash a relational DB. DynamoDB delivers **single-digit millisecond reads** at any scale, and PAY_PER_REQUEST means **₹0 idle cost** overnight when teams aren't coding. A JOIN-heavy RDS instance would sit idle burning reserved capacity.
-
-### Lambda over EC2 / ECS
-There is no sustained load — events arrive in bursts during working hours then go silent. Lambda scales to **zero between events** and to **hundreds of concurrent executions** during a commit storm. EC2 or ECS would require capacity planning, health checks, and a baseline bill even at rest.
-
-### Model Tiering — Nova Pro → Nova Lite
-`us.amazon.nova-pro-v1:0` is used only for **high-value, once-per-commit intent extraction** where accuracy matters. `us.amazon.nova-lite-v1:0` handles **interactive chat and Q&A** where latency matters. This splits cost and latency: Pro costs ~4× more; routing cheaper queries to Lite cuts the AI bill by ~60% for typical usage.
-
-### Async Ingestion Pipeline
-The ingestion Lambda stores the raw event to DynamoDB immediately (200 ms latency), then fires `invokeAsync` to the AI processing Lambda. The developer's push hook gets an instant `200 OK` and is never blocked waiting on Bedrock. AI processing happens in the background within seconds.
-
-### S3 Archival for Query Audit
-Every raw event payload is also archived to S3 (`flowsync-raw-*`). This provides a **full audit trail** for debugging, compliance, and potential future ML training — at roughly ₹1.7/GB/month with no compute cost.
-
-### API Gateway over ALB
-API Gateway provides **built-in rate limiting, per-client API keys, request validation, and TLS termination** — all configured with a single CDK resource. An ALB would require a separate WAF, custom auth Lambda, and manual cert rotation.
-
-### Titan Embeddings for RAG
-Amazon Titan Text Embeddings v1 is **natively integrated** with Bedrock, requires no external vector DB, and stores 1,536-dimension embedding arrays directly in DynamoDB beside the context item. This eliminates the operational overhead of running a separate Pinecone or pgvector instance.
-
-### Scrypt over Bcrypt for Token Hashing
-Project API tokens are hashed with `scrypt` (N=16384, r=8, p=1). Scrypt is **memory-hard** (not just CPU-hard like bcrypt), making GPU-based brute-force attacks ~100× more expensive for an attacker, with no observable difference to the user.
-
----
-
-## �🆚 FlowSync vs. Alternatives
-
-| | FlowSync | Git Logs | Documentation | AI Assistants |
-|--|---------|----------|---------------|---------------|
-| AI agent can log & query context | ✅ | ❌ | ❌ | ❌ |
-| Captures *why* changes happen | ✅ | ❌ | ❌ | ❌ |
-| Auto-updated (no manual work) | ✅ | ✅ | ❌ | ❌ |
-| Persistent project memory | ✅ | ❌ | ❌ | ❌ |
-| Natural language Q&A with citations | ✅ | ❌ | ❌ | Partial |
-| MCP-native (works with Copilot/Cursor) | ✅ | ❌ | ❌ | ❌ |
-
----
-
-## 🎯 USP
-
-- **Agent-First Architecture** — Built for AI agents as the primary user; MCP tools are the main interface, not an afterthought
-- **Persistent Memory** — Unlike chat history, FlowSync stores structured, searchable project knowledge forever
-- **Dual Input** — AI agent logging + automatic git push capture ensures no context is ever lost
-- **Guaranteed Accountability** — Strict traceability and source citations prevent AI hallucinations about project facts
-- **First of its kind** — The first system that gives AI coding agents persistent, project-wide memory via MCP
-
----
-
-## 🚀 Quick Start
+## Getting Started
 
 ### Prerequisites
-- VS Code 1.85+
-- A git repository
 
-### 1. Install the Extension
-Download `flowsync-1.0.1.vsix` from the [Releases](https://github.com/anoushkawasthi/flowsync/releases) page or from the [FlowSync website](https://flowsync.aahil-khan.tech/).
+-   Node.js and npm versions compatible with the package manifests
+-   Python 3.12 for Python-based Lambda components
+-   Visual Studio Code for extension development
+-   AWS credentials and permissions for backend integration tests
+-   Access to the required Amazon Bedrock models for AI functionality
 
-```bash
-code --install-extension flowsync-1.0.1.vsix
+### 1. Clone the repository
+
+``` bash
+git clone https://github.com/JainMehul05/CodeAtlas.git
+cd CodeAtlas
 ```
 
-### 2. Initialize Your Project
-Open your repo in VS Code. Click the **⚡ FlowSync** button in the status bar → **Initialize Project**.
+### 2. Review component setup
 
-FlowSync auto-detects your project name, languages, frameworks, and branch. You’ll receive a **Project ID** and **API Token** — save these and share the token with teammates.
+The repository contains multiple independently configured components.
+Read the relevant package manifests and component documentation before
+installing dependencies or running commands. Install dependencies from
+the appropriate project directory.
 
-### 3. Connect Your AI Agent
-Your agent (Copilot, Cursor, Claude) should automatically discover 5 MCP tools: `log_context`, `search_context`, `get_project_context`, `get_recent_changes`, and `get_events`.
+### 3. Configure environment variables
 
-If not, add `.vscode/mcp.json` to your repo:
-```jsonc
-{
-  "servers": {
-    "flowsync": {
-      "type": "stdio",
-      "command": "node",
-      "args": ["${workspaceFolder}/mcp-server/dist/index.js"],
-      "env": {
-        "FLOWSYNC_PROJECT_ID": "<your-project-id>",
-        "FLOWSYNC_TOKEN": "${input:flowsync-token}"
-      }
-    }
-  }
-}
-```
+Review available `.env.example` files and create local configuration
+files as required by each component.
 
-### 4. Start Working
-- **Your AI agent** calls `log_context` after completing tasks and `search_context` before starting new work — automatically
-- **Git pushes** are auto-captured as a fallback, even without an AI agent
-- **Open the dashboard** at [flowsync.site](https://flowsync.aahil-khan.tech/) with your Project ID and Token
+-   Never commit real API tokens, AWS credentials, private keys, or
+    production secrets.
+-   Do not put confidential values in `NEXT_PUBLIC_*` variables: these
+    are exposed to browser-side code.
+-   Use placeholders in example environment files.
+-   Rotate any credential that has previously been exposed.
 
-> **Try it now:** Visit the dashboard and click “Try Demo Project” to explore a live project — no setup needed.
+### 4. Build and test
 
----
-## 📚 Documentation
+Use the build and test scripts defined by each component's package
+configuration. Verify the shared package and its consumers after
+integration changes. Run CDK synthesis to validate infrastructure
+definitions before considering deployment.
 
-- **[Team Study Guide](DOCUMENTATION/study/README.md)** — Start here if you're new to the codebase. A ~2.5 hr guided path: what it is, the stack, the five end-to-end flows, the decision register, a code map, and a self-check quiz
-- **[Technical Deep Dive](DOCUMENTATION/technical-deep-dive.md)** — Full architecture, implementation details, MCP server, RAG pipeline, caching, security, and more
-- **[Performance Report](DOCUMENTATION/performance-report.md)** — Benchmark results, latency breakdowns, extraction accuracy, and cost analysis
+> These are setup guidelines, not a claim that a clean installation or
+> end-to-end workflow has been verified on every machine.
 
----
-## 👥 Team
+## Engineering Principles
 
-| Name | Role |
-|------|------|
-| **Aahil Khan** | Team Leader |
-| **Anoushka Awasthi** | Team Member |
-| **Maulik Dang** | Team Member |
-| **Sanyam Wadhwa** | Team Member |
+-   **Reliability before complexity:** strengthen the existing
+    serverless architecture before introducing infrastructure without a
+    demonstrated need.
+-   **Traceable AI:** ground answers in available project records and
+    provide source attribution where supported.
+-   **Asynchronous processing:** avoid blocking ingestion on potentially
+    slow AI processing; add durable queues and controlled retries as
+    part of the reliability roadmap.
+-   **Security by design:** keep secrets out of source control and
+    enforce appropriate access boundaries.
+-   **Measured improvements:** justify architectural changes through
+    tests and evidence about reliability, retrieval quality, latency,
+    and cost.
 
----
+## Project Direction
 
-*Built with ❤️ for the **AI for Bharat Hackathon***
+CodeAtlas is intended to evolve from persistent project context into a
+broader engineering-intelligence layer. The longer-term goal is to
+connect code changes, technical decisions, CI/CD outcomes, and
+deployments so developers and AI assistants can investigate engineering
+questions using evidence from the project.
 
+The roadmap is incremental. Features will be described as implemented
+only after the corresponding code, tests, and integration have been
+verified.
 
+## Maintainer
+
+**Mehul Jain**
+
+Repository:
+[JainMehul05/CodeAtlas](https://github.com/JainMehul05/CodeAtlas)
