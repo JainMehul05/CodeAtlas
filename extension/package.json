@@ -1,0 +1,273 @@
+{
+  "name": "flowsync",
+  "displayName": "FlowSync",
+  "description": "FlowSync — Persistent project context for AI coding agents. Capture, understand, and query your team's dev context with AI.",
+  "version": "1.2.0",
+  "publisher": "vanta-thapar",
+  "icon": "assets/logo.png",
+  "galleryBanner": {
+    "color": "#faf7f0",
+    "theme": "light"
+  },
+  "keywords": [
+    "ai",
+    "context",
+    "git",
+    "productivity",
+    "team",
+    "copilot",
+    "mcp",
+    "knowledge"
+  ],
+  "categories": [
+    "AI",
+    "Other"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/anoushkawasthi/flowsync"
+  },
+  "engines": {
+    "vscode": "^1.109.0"
+  },
+  "activationEvents": [
+    "workspaceContains:.flowsync.json",
+    "onView:flowsync.sidebar"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "flowsync",
+          "title": "FlowSync",
+          "icon": "assets/icons/activity-bar.svg"
+        }
+      ]
+    },
+    "views": {
+      "flowsync": [
+        {
+          "type": "webview",
+          "id": "flowsync.sidebar",
+          "name": "Project Context"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "flowsync.openPanel",
+        "category": "FlowSync",
+        "title": "Open Dashboard",
+        "icon": "$(dashboard)"
+      },
+      {
+        "command": "flowsync.catchMeUp",
+        "category": "FlowSync",
+        "title": "Catch Me Up",
+        "icon": "$(history)"
+      },
+      {
+        "command": "flowsync.recordReasoning",
+        "category": "FlowSync",
+        "title": "Record Reasoning",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "flowsync.openWebDashboard",
+        "category": "FlowSync",
+        "title": "Open Web Dashboard",
+        "icon": "$(globe)"
+      },
+      {
+        "command": "flowsync.openChat",
+        "category": "FlowSync",
+        "title": "Ask FlowSync",
+        "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "flowsync.refresh",
+        "category": "FlowSync",
+        "title": "Refresh Status",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "flowsync.openOutput",
+        "category": "FlowSync",
+        "title": "Show Logs",
+        "icon": "$(output)"
+      },
+      {
+        "command": "flowsync.initProject",
+        "category": "FlowSync",
+        "title": "Initialize Project"
+      },
+      {
+        "command": "flowsync.joinProject",
+        "category": "FlowSync",
+        "title": "Join Project"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "flowsync.refresh",
+          "when": "view == flowsync.sidebar",
+          "group": "navigation@1"
+        },
+        {
+          "command": "flowsync.openPanel",
+          "when": "view == flowsync.sidebar",
+          "group": "navigation@2"
+        },
+        {
+          "command": "flowsync.catchMeUp",
+          "when": "view == flowsync.sidebar",
+          "group": "1_flowsync@1"
+        },
+        {
+          "command": "flowsync.openOutput",
+          "when": "view == flowsync.sidebar",
+          "group": "1_flowsync@2"
+        },
+        {
+          "command": "flowsync.recordReasoning",
+          "when": "view == flowsync.sidebar",
+          "group": "navigation@0"
+        },
+        {
+          "command": "flowsync.openWebDashboard",
+          "when": "view == flowsync.sidebar",
+          "group": "1_flowsync@0"
+        }
+      ],
+      "scm/title": [
+        {
+          "command": "flowsync.catchMeUp",
+          "when": "scmProvider == git",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "flowsync.initProject",
+          "when": "!flowsync.connected"
+        },
+        {
+          "command": "flowsync.joinProject",
+          "when": "!flowsync.connected"
+        },
+        {
+          "command": "flowsync.catchMeUp",
+          "when": "flowsync.connected"
+        },
+        {
+          "command": "flowsync.refresh",
+          "when": "flowsync.connected"
+        },
+        {
+          "command": "flowsync.recordReasoning",
+          "when": "flowsync.connected"
+        },
+        {
+          "command": "flowsync.openWebDashboard",
+          "when": "true"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "flowsync.openPanel",
+        "key": "ctrl+alt+f",
+        "mac": "cmd+alt+f"
+      },
+      {
+        "command": "flowsync.catchMeUp",
+        "key": "ctrl+alt+u",
+        "mac": "cmd+alt+u",
+        "when": "flowsync.connected"
+      },
+      {
+        "command": "flowsync.recordReasoning",
+        "key": "ctrl+alt+r",
+        "mac": "cmd+alt+r",
+        "when": "flowsync.connected"
+      }
+    ],
+    "configuration": {
+      "title": "FlowSync",
+      "properties": {
+        "flowsync.autoOpenOutput": {
+          "type": "boolean",
+          "default": false,
+          "description": "Open the Output panel when FlowSync activates."
+        },
+        "flowsync.backendUrl": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Override the FlowSync backend URL. Leave empty to use the bundled default."
+        },
+        "flowsync.dashboardUrl": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "URL of the FlowSync web dashboard. Leave empty to use the hosted default."
+        },
+        "flowsync.showPushNotification": {
+          "type": "boolean",
+          "default": true,
+          "description": "Prompt to add reasoning after each git push."
+        },
+        "flowsync.statusBar.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show FlowSync in the status bar."
+        }
+      }
+    },
+    "colors": [
+      {
+        "id": "flowsync.statusBarConnected",
+        "description": "Status bar background when FlowSync is connected.",
+        "defaults": {
+          "light": "#B84E35",
+          "dark": "#CF6A4D",
+          "highContrast": "#B84E35"
+        }
+      },
+      {
+        "id": "flowsync.statusBarDisconnected",
+        "description": "Status bar background when FlowSync is not connected.",
+        "defaults": {
+          "light": "#6B6B78",
+          "dark": "#565663",
+          "highContrast": "#6B6B78"
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "cd ../mcp-server && npm run bundle && cd ../extension && npm run package",
+    "compile": "webpack",
+    "watch": "webpack --watch",
+    "package": "webpack --mode production --devtool hidden-source-map",
+    "vsix": "vsce package",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "npm run compile-tests && npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.109.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "22.x",
+    "typescript-eslint": "^8.54.0",
+    "eslint": "^9.39.2",
+    "typescript": "^5.9.3",
+    "ts-loader": "^9.5.4",
+    "webpack": "^5.104.1",
+    "webpack-cli": "^6.0.1",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2"
+  }
+}

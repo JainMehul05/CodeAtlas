@@ -1,0 +1,8 @@
+/* Single entry point. Split from what used to be a 225-line index.css holding
+   both the tokens and the entire Chat stylesheet, plus an 864-line App.css
+   holding everything else. Order matters: tokens define the variables the rest
+   consume. */
+@import './styles/tokens.css';
+@import './styles/base.css';
+@import './styles/components.css';
+@import './styles/views.css';

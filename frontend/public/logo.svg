@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-label="BuildBerry">
+  <!--
+    App-icon treatment: the mark on an accent-filled tile with a hard border.
+    Square by construction — the marketplace icon and the favicon are rastered
+    from this, replacing the old 500x300 PNG that was squashed into every square
+    box it appeared in. No baked-in shadow: launchers and the marketplace apply
+    their own, and a doubled shadow reads as a rendering bug.
+  -->
+  <rect x="4" y="4" width="120" height="120" rx="22" fill="#FF5C39" stroke="#16161A" stroke-width="8" />
+  <!--
+    Mark on the 32 grid. Its ink spans 2..30, so the bounding box is 28 wide and
+    centred at (16,16). At scale 2.6 that is 72.8px inside a 104px tile interior,
+    leaving even 15px optical padding; translate = 64 - 16 * 2.6 recentres it.
+  -->
+  <g fill="#16161A" transform="translate(22.4 22.4) scale(2.6)">
+    <rect x="2" y="2" width="9" height="9" />
+    <rect x="4" y="11" width="5" height="8" />
+    <rect x="4" y="14" width="24" height="5" />
+    <rect x="23" y="14" width="5" height="8" />
+    <rect x="21" y="21" width="9" height="9" />
+  </g>
+</svg>

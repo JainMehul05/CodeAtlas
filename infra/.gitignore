@@ -1,0 +1,42 @@
+# Compiled JavaScript (except Lambda handlers and config)
+*.js
+!jest.config.js
+!lambda/**/*.js
+!bin/infra.js
+*.d.ts
+
+# Dependencies
+node_modules/
+
+# CDK output
+.cdk.staging
+cdk.out/
+
+# Coverage
+coverage/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+
+# Test output
+*.test.log
+chat-logs-*.txt
+chat-conversation-*.txt
