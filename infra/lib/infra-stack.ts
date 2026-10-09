@@ -7,6 +7,12 @@ import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as sqs from 'aws-cdk-lib/aws-sqs';
+import * as lambdaEventSources from 'aws-cdk-lib/aws-lambda-event-sources';
+import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
+import * as cloudwatchActions from 'aws-cdk-lib/aws-cloudwatch-actions';
+import * as sns from 'aws-cdk-lib/aws-sns';
+import * as snsSubscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
 import { Construct } from 'constructs';
 import * as path from 'path';
 
@@ -92,7 +98,18 @@ export class InfraStack extends cdk.Stack {
       timeToLiveAttribute: 'expiresAt', // auto-expire cache entries after 1 hour
     });
 
-    const allTables = [projectsTable, eventsTable, contextTable, auditTable, chatSessionsTable, cacheTable];
+    // ─────────────────────────────────────────────
+    // IDEMPOTENCY TABLE (for duplicate event detection)
+    // ─────────────────────────────────────────────
+    const idempotencyTable = new dynamodb.Table(this, 'FlowSyncIdempotency', {
+      tableName: 'flowsync-idempotency',
+      partitionKey: { name: 'idempotencyKey', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      timeToLiveAttribute: 'expiresAt', // auto-expire after 7 days
+    });
+
+    const allTables = [projectsTable, eventsTable, contextTable, auditTable, chatSessionsTable, cacheTable, idempotencyTable];
 
     // ─────────────────────────────────────────────
     // S3 BUCKETS
@@ -103,6 +120,30 @@ export class InfraStack extends cdk.Stack {
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
+    });
+
+    // ─────────────────────────────────────────────
+    // SQS QUEUES (for reliable event processing)
+    // ─────────────────────────────────────────────
+
+    // Dead Letter Queue for failed event processing
+    const dlq = new sqs.Queue(this, 'FlowSyncDLQ', {
+      queueName: 'flowsync-dlq',
+      retentionPeriod: cdk.Duration.days(14), // Keep failed messages for 14 days for inspection
+      encryption: sqs.QueueEncryption.SQS_MANAGED,
+    });
+
+    // Main processing queue with DLQ
+    const processingQueue = new sqs.Queue(this, 'FlowSyncProcessingQueue', {
+      queueName: 'flowsync-processing',
+      visibilityTimeout: cdk.Duration.seconds(90), // 90s > Lambda timeout (60s) + buffer
+      retentionPeriod: cdk.Duration.days(4), // Keep messages for 4 days
+      receiveMessageWaitTime: cdk.Duration.seconds(20), // Long polling
+      deadLetterQueue: {
+        queue: dlq,
+        maxReceiveCount: 3, // Move to DLQ after 3 failed attempts
+      },
+      encryption: sqs.QueueEncryption.SQS_MANAGED,
     });
 
     // ─────────────────────────────────────────────
@@ -146,7 +187,7 @@ export class InfraStack extends cdk.Stack {
       functionName: 'flowsync-ingestion',
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
-      code: lambda.Code.fromAsset(path.join(__dirname, '../lambda/ingestion')),
+      code: lambda.Code.fromAsset(path.join(__dirname, '../lambda/ingestion/dist')),
       timeout: cdk.Duration.seconds(10),
       memorySize: 256,
       environment: {
@@ -155,7 +196,7 @@ export class InfraStack extends cdk.Stack {
         CONTEXT_TABLE: contextTable.tableName,
         AUDIT_TABLE: auditTable.tableName,
         RAW_EVENTS_BUCKET: rawEventsBucket.bucketName,
-        AI_PROCESSING_FUNCTION_NAME: 'flowsync-ai-processing',
+        PROCESSING_QUEUE_URL: processingQueue.queueUrl,
       },
     });
 
@@ -171,10 +212,18 @@ export class InfraStack extends cdk.Stack {
         EVENTS_TABLE: eventsTable.tableName,
         CONTEXT_TABLE: contextTable.tableName,
         AUDIT_TABLE: auditTable.tableName,
+        IDEMPOTENCY_TABLE: idempotencyTable.tableName,
         FALLBACK_MODEL_ID: 'us.amazon.nova-lite-v1:0',
       },
     });
     aiProcessingFn.addToRolePolicy(bedrockPolicy);
+
+    // Add SQS event source mapping for AI Processing Lambda
+    aiProcessingFn.addEventSource(new lambdaEventSources.SqsEventSource(processingQueue, {
+      batchSize: 5, // Process up to 5 messages at a time
+      maxBatchingWindow: cdk.Duration.seconds(30), // Wait up to 30s to fill batch
+      reportBatchItemFailures: true, // Allow partial batch failure reporting
+    }));
 
     const mcpFn = new lambda.Function(this, 'McpFn', {
       functionName: 'flowsync-mcp',
@@ -241,8 +290,11 @@ export class InfraStack extends cdk.Stack {
     // Grant S3 permissions
     rawEventsBucket.grantPut(ingestionFn);
 
-    // Grant Ingestion Lambda permission to invoke AI Processing Lambda
-    aiProcessingFn.grantInvoke(ingestionFn);
+    // Grant Ingestion Lambda permission to send messages to processing queue
+    processingQueue.grantSendMessages(ingestionFn);
+
+    // Grant AI Processing Lambda permissions for idempotency table
+    idempotencyTable.grantReadWriteData(aiProcessingFn);
 
     // ─────────────────────────────────────────────
     // API GATEWAY (REST API)
@@ -286,6 +338,10 @@ export class InfraStack extends cdk.Stack {
     // POST /mcp
     api.root.addResource('mcp').addMethod('POST', mcpIntegration);
 
+    // POST /webhooks/github - GitHub webhook ingestion
+    const githubWebhookIntegration = new apigateway.LambdaIntegration(ingestionFn);
+    api.root.addResource('webhooks').addResource('github').addMethod('POST', githubWebhookIntegration);
+
     // ─────────────────────────────────────────────
     // OUTPUTS (printed after deploy)
     // ─────────────────────────────────────────────
@@ -297,6 +353,180 @@ export class InfraStack extends cdk.Stack {
 
     new cdk.CfnOutput(this, 'RawEventsBucket', {
       value: rawEventsBucket.bucketName,
+    });
+
+    new cdk.CfnOutput(this, 'ProcessingQueueUrl', {
+      value: processingQueue.queueUrl,
+      description: 'SQS queue URL for event processing',
+    });
+
+    new cdk.CfnOutput(this, 'DLQUrl', {
+      value: dlq.queueUrl,
+      description: 'Dead Letter Queue URL for failed event processing',
+    });
+
+    // ─────────────────────────────────────────────
+    // CLOUDWATCH METRICS & ALARMS (Observability)
+    // ─────────────────────────────────────────────
+
+    // SNS topic for alarm notifications
+    const alarmTopic = new sns.Topic(this, 'FlowSyncAlarms', {
+      topicName: 'flowsync-alarms',
+      displayName: 'FlowSync Operational Alarms',
+    });
+
+    // Queue metrics
+    const queueVisibleMessages = processingQueue.metricApproximateNumberOfMessagesVisible({
+      period: cdk.Duration.minutes(5),
+      statistic: 'Average',
+    });
+    const queueInFlightMessages = processingQueue.metricApproximateNumberOfMessagesNotVisible({
+      period: cdk.Duration.minutes(5),
+      statistic: 'Average',
+    });
+    const queueAgeMs = processingQueue.metricApproximateAgeOfOldestMessage({
+      period: cdk.Duration.minutes(5),
+      statistic: 'Maximum',
+    });
+
+    // DLQ metric
+    const dlqMessages = dlq.metricApproximateNumberOfMessagesVisible({
+      period: cdk.Duration.minutes(5),
+      statistic: 'Maximum',
+    });
+
+    // Lambda metrics
+    const ingestionErrors = ingestionFn.metricErrors({
+      period: cdk.Duration.minutes(5),
+      statistic: 'Sum',
+    });
+    const aiProcessingErrors = aiProcessingFn.metricErrors({
+      period: cdk.Duration.minutes(5),
+      statistic: 'Sum',
+    });
+    const aiProcessingThrottles = aiProcessingFn.metricThrottles({
+      period: cdk.Duration.minutes(5),
+      statistic: 'Sum',
+    });
+    const aiProcessingDuration = aiProcessingFn.metricDuration({
+      period: cdk.Duration.minutes(5),
+      statistic: 'Average',
+    });
+    const aiProcessingInvocations = aiProcessingFn.metricInvocations({
+      period: cdk.Duration.minutes(5),
+      statistic: 'Sum',
+    });
+
+    // Alarms
+    new cloudwatch.Alarm(this, 'HighQueueBacklog', {
+      alarmName: 'flowsync-high-queue-backlog',
+      alarmDescription: 'Processing queue has >100 visible messages for 10 minutes',
+      metric: queueVisibleMessages,
+      threshold: 100,
+      evaluationPeriods: 2,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    }).addAlarmAction(new cloudwatchActions.SnsAction(alarmTopic));
+
+    new cloudwatch.Alarm(this, 'HighQueueAge', {
+      alarmName: 'flowsync-high-queue-age',
+      alarmDescription: 'Oldest message in queue exceeds visibility timeout (90s)',
+      metric: queueAgeMs,
+      threshold: 90000,
+      evaluationPeriods: 1,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    }).addAlarmAction(new cloudwatchActions.SnsAction(alarmTopic));
+
+    new cloudwatch.Alarm(this, 'DLQHasMessages', {
+      alarmName: 'flowsync-dlq-has-messages',
+      alarmDescription: 'Dead letter queue has messages requiring investigation',
+      metric: dlqMessages,
+      threshold: 0,
+      evaluationPeriods: 1,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    }).addAlarmAction(new cloudwatchActions.SnsAction(alarmTopic));
+
+    new cloudwatch.Alarm(this, 'AIProcessingErrors', {
+      alarmName: 'flowsync-ai-processing-errors',
+      alarmDescription: 'AI Processing Lambda error rate > 5% over 5 minutes',
+      metric: new cloudwatch.MathExpression({
+        expression: 'errors / invocations * 100',
+        usingMetrics: { errors: aiProcessingErrors, invocations: aiProcessingInvocations },
+        period: cdk.Duration.minutes(5),
+      }),
+      threshold: 5,
+      evaluationPeriods: 2,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    }).addAlarmAction(new cloudwatchActions.SnsAction(alarmTopic));
+
+    new cloudwatch.Alarm(this, 'AIProcessingThrottles', {
+      alarmName: 'flowsync-ai-processing-throttles',
+      alarmDescription: 'AI Processing Lambda throttled',
+      metric: aiProcessingThrottles,
+      threshold: 1,
+      evaluationPeriods: 1,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    }).addAlarmAction(new cloudwatchActions.SnsAction(alarmTopic));
+
+    new cloudwatch.Alarm(this, 'AIProcessingHighLatency', {
+      alarmName: 'flowsync-ai-processing-high-latency',
+      alarmDescription: 'AI Processing Lambda p50 latency > 30s',
+      metric: aiProcessingDuration,
+      threshold: 30000,
+      evaluationPeriods: 3,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    }).addAlarmAction(new cloudwatchActions.SnsAction(alarmTopic));
+
+    new cloudwatch.Alarm(this, 'IngestionErrors', {
+      alarmName: 'flowsync-ingestion-errors',
+      alarmDescription: 'Ingestion Lambda error rate > 1% over 5 minutes',
+      metric: ingestionErrors,
+      threshold: 5, // 5 errors in 5 min
+      evaluationPeriods: 2,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+    }).addAlarmAction(new cloudwatchActions.SnsAction(alarmTopic));
+
+    // Dashboard for quick operational visibility
+    const dashboard = new cloudwatch.Dashboard(this, 'FlowSyncDashboard', {
+      dashboardName: 'FlowSync-Operational',
+      widgets: [
+        [
+          new cloudwatch.GraphWidget({
+            title: 'Queue Health',
+            left: [queueVisibleMessages, queueInFlightMessages],
+            right: [queueAgeMs],
+            width: 12,
+            height: 6,
+          }),
+          new cloudwatch.GraphWidget({
+            title: 'DLQ Messages',
+            left: [dlqMessages],
+            width: 12,
+            height: 6,
+          }),
+        ],
+        [
+          new cloudwatch.GraphWidget({
+            title: 'AI Processing Lambda',
+            left: [aiProcessingInvocations, aiProcessingErrors],
+            right: [aiProcessingDuration, aiProcessingThrottles],
+            width: 12,
+            height: 6,
+          }),
+          new cloudwatch.GraphWidget({
+            title: 'Ingestion Lambda',
+            left: [ingestionErrors],
+            width: 12,
+            height: 6,
+          }),
+        ],
+      ],
     });
 
     // ─────────────────────────────────────────────

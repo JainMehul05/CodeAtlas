@@ -125,7 +125,7 @@ export function InitProject({ onNavigate }: InitProjectProps) {
             </svg>
           </div>
           <h2>No Git repository found</h2>
-          <p>BuildBerry requires a git repository in your workspace root. Initialise one first, then come back.</p>
+          <p>FlowSync requires a git repository in your workspace root. Initialise one first, then come back.</p>
           <div className="no-git-command">
             <code>git init</code>
           </div>

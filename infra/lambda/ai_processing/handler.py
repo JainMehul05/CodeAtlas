@@ -3,26 +3,30 @@ import boto3
 import os
 import uuid
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from botocore.exceptions import ClientError
 from botocore.config import Config as BotoConfig
 
 # Model and embedding configuration
 MODEL_ID = "us.amazon.nova-pro-v1:0"
-EMBEDDING_MODEL_ID = "amazon.titan-embed-text-v1"  # Using v1 for compatibility with existing embeddings
+EMBEDDING_MODEL_ID = "amazon.titan-embed-text-v1"
 FALLBACK_MODEL_ID = os.environ.get("FALLBACK_MODEL_ID", "us.amazon.nova-lite-v1:0")
 
-# DynamoDB table names (set via environment variables or hardcoded for prototype)
+# DynamoDB table names
 CONTEXT_TABLE = os.environ.get("CONTEXT_TABLE", "flowsync-context")
 AUDIT_TABLE = os.environ.get("AUDIT_TABLE", "flowsync-audit")
 PROJECTS_TABLE = os.environ.get("PROJECTS_TABLE", "flowsync-projects")
+IDEMPOTENCY_TABLE = os.environ.get("IDEMPOTENCY_TABLE", "flowsync-idempotency")
 
-# Bedrock client with adaptive retry — handles ThrottlingException (429) with exponential backoff
+# Bedrock client with adaptive retry
 _bedrock_retry_config = BotoConfig(retries={'max_attempts': 3, 'mode': 'adaptive'})
 bedrock_client = boto3.client("bedrock-runtime", config=_bedrock_retry_config)
 dynamodb = boto3.resource("dynamodb")
 cloudwatch = boto3.client("cloudwatch")
+
+# Idempotency TTL (7 days in seconds)
+IDEMPOTENCY_TTL_SECONDS = 7 * 24 * 60 * 60
 
 def call_bedrock(event_data):
     """Call Nova Pro via Bedrock Converse API with commit metadata and return extracted context as JSON."""
@@ -72,8 +76,6 @@ Rules for 'decision' field:
 
 Extract only factual information present in the diff and message. Do not invent or assume."""
 
-    # Bedrock Converse API — works with Nova Pro and all Amazon/Meta models
-    # Falls back to FALLBACK_MODEL_ID (Nova Lite) if Nova Pro throttles
     t0 = time.time()
     model_used = MODEL_ID
     try:
@@ -102,13 +104,11 @@ Extract only factual information present in the diff and message. Do not invent 
     print(f"BEDROCK_TIMING input_tokens={usage.get('inputTokens', 0)} output_tokens={usage.get('outputTokens', 0)} duration_ms={bedrock_duration_ms}")
     print(f"Bedrock response metadata: {json.dumps(usage, default=str)}")
 
-    # Converse API response format: output.message.content[0].text
     try:
         output_text = response['output']['message']['content'][0]['text'].strip()
     except (KeyError, IndexError, TypeError) as e:
         raise ValueError(f"Unexpected Bedrock Converse response structure: {e}. Response: {response}")
 
-    # Strip markdown code fences if present
     if output_text.startswith('```json'):
         output_text = output_text.split('```json')[1].split('```')[0].strip()
     elif output_text.startswith('```'):
@@ -119,7 +119,6 @@ Extract only factual information present in the diff and message. Do not invent 
     return result
 
 def validate_extraction_schema(data):
-    """Validate Bedrock output against expected schema."""
     required_fields = [
         "feature", "decision", "tasks", "stage", "risk", "entities"
     ]
@@ -128,18 +127,7 @@ def validate_extraction_schema(data):
             raise ValueError(f"Missing required field: {field}")
     return True
 
-
 def compute_confidence(extraction):
-    """
-    Deterministic confidence score based on extraction completeness.
-    Replaces the flat 0.85 default the model was producing.
-      0.55  base  — feature was identified
-     +0.15  decision populated
-     +0.15  risk populated
-     +0.10  at least one task inferred
-     +0.05  2+ entities extracted
-    Max: 1.0
-    """
     score = 0.55
     if extraction.get('decision'):
         score += 0.15
@@ -152,7 +140,6 @@ def compute_confidence(extraction):
     return round(min(score, 1.0), 2)
 
 def convert_floats_to_decimal(obj):
-    """Convert all float values to Decimal for DynamoDB compatibility."""
     if isinstance(obj, list):
         return [convert_floats_to_decimal(item) for item in obj]
     elif isinstance(obj, dict):
@@ -163,7 +150,6 @@ def convert_floats_to_decimal(obj):
         return obj
 
 def call_titan_embedding(text):
-    """Call Titan Embeddings to generate a vector for the given text."""
     t0 = time.time()
     response = bedrock_client.invoke_model(
         modelId=EMBEDDING_MODEL_ID,
@@ -180,19 +166,15 @@ def call_titan_embedding(text):
     return embedding, embedding_duration_ms
 
 def write_context_record(context_record):
-    """Write the context record to DynamoDB."""
     table = dynamodb.Table(CONTEXT_TABLE)
-    # Convert floats to Decimal for DynamoDB compatibility
     context_record = convert_floats_to_decimal(context_record)
     table.put_item(Item=context_record)
 
 def write_audit_record(audit_record):
-    """Write the audit record to DynamoDB."""
     table = dynamodb.Table(AUDIT_TABLE)
     table.put_item(Item=audit_record)
 
 def update_project_activity(project_id, timestamp):
-    """Update lastActivityAt and increment eventCount in projects table."""
     table = dynamodb.Table(PROJECTS_TABLE)
     table.update_item(
         Key={"projectId": project_id},
@@ -201,19 +183,12 @@ def update_project_activity(project_id, timestamp):
     )
 
 def find_orphaned_record(project_id, branch, author, timestamp):
-    """
-    Find an uncommitted record (commitHash: null) for the same branch and author
-    within 30 minutes of the given timestamp. Direction B: log-first scenario.
-    """
     table = dynamodb.Table(CONTEXT_TABLE)
     
-    # Calculate time window (30 minutes before timestamp)
     time_obj = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
     window_start = (time_obj - timedelta(minutes=30)).isoformat().replace('+00:00', 'Z')
     
     try:
-        # BranchContextIndex GSI: PK=projectId, SK=branch#extractedAt
-        # Filter for uncommitted records (commitHash is None) by this author
         response = table.query(
             IndexName='BranchContextIndex',
             KeyConditionExpression='projectId = :pk AND branchExtractedAt BETWEEN :start AND :end',
@@ -226,7 +201,7 @@ def find_orphaned_record(project_id, branch, author, timestamp):
                 ':author': author
             },
             Limit=1,
-            ScanIndexForward=False  # Most recent first
+            ScanIndexForward=False
         )
         
         if response.get('Items'):
@@ -237,7 +212,6 @@ def find_orphaned_record(project_id, branch, author, timestamp):
         return None
 
 def update_orphaned_record(event_id, commit_hash, timestamp):
-    """Bind commitHash to an existing uncommitted record."""
     table = dynamodb.Table(CONTEXT_TABLE)
     table.update_item(
         Key={"eventId": event_id},
@@ -252,7 +226,6 @@ def update_orphaned_record(event_id, commit_hash, timestamp):
     print(f"Updated orphaned record {event_id} with commitHash {commit_hash}")
 
 def publish_cloudwatch_metric(metric_name, value, project_id):
-    """Publish a custom CloudWatch metric for monitoring."""
     try:
         cloudwatch.put_metric_data(
             Namespace='FlowSync',
@@ -276,7 +249,6 @@ def publish_cloudwatch_metric(metric_name, value, project_id):
         print(f"Failed to publish CloudWatch metric: {str(e)}")
 
 def propagate_branch_context(project_id, source_branch, target_branch, timestamp):
-    """Copy all completed context records from source_branch to target_branch on merge."""
     table = dynamodb.Table(CONTEXT_TABLE)
 
     all_records = []
@@ -290,7 +262,6 @@ def propagate_branch_context(project_id, source_branch, target_branch, timestamp
     }
     while True:
         response = table.query(**kwargs)
-        # Only propagate non-failed records
         all_records.extend(r for r in response.get('Items', []) if r.get('status') != 'failed')
         last_key = response.get('LastEvaluatedKey')
         if not last_key:
@@ -314,175 +285,391 @@ def propagate_branch_context(project_id, source_branch, target_branch, timestamp
     return len(all_records)
 
 
-def handler(event, context):
-    print("AI Processing Lambda invoked", json.dumps(event))
-    project_id = event.get("projectId", "test-project")
+# ─────────────────────────────────────────────────────────────────────────────
+# IDEMPOTENCY HELPERS
+# ─────────────────────────────────────────────────────────────────────────────
 
-    # ── Branch merge propagation path ──
-    # Triggered by Ingestion Lambda when a merge commit is detected.
-    if event.get('propagate'):
-        source_branch = event.get('sourceBranch')
-        target_branch = event.get('targetBranch')
-        timestamp     = event.get('timestamp', datetime.utcnow().isoformat() + 'Z')
-        if not source_branch or not target_branch:
-            return {'statusCode': 400, 'body': json.dumps({'error': 'sourceBranch and targetBranch required'})}
-        try:
-            count = propagate_branch_context(project_id, source_branch, target_branch, timestamp)
-            update_project_activity(project_id, timestamp)
-            return {'statusCode': 200, 'body': json.dumps({'propagated': count, 'from': source_branch, 'to': target_branch})}
-        except Exception as e:
-            print(f"[propagate] Error: {e}")
-            return {'statusCode': 500, 'body': json.dumps({'error': str(e)})}
-
+def check_idempotency(idempotency_key: str) -> tuple[bool, dict | None]:
+    """
+    Check if an event has already been processed.
+    Returns (is_duplicate, existing_record).
+    Handles stale PROCESSING records by allowing reprocessing if older than lease threshold.
+    """
+    table = dynamodb.Table(IDEMPOTENCY_TABLE)
     try:
-        # Day 1: Use hardcoded diff for initial test
-        # Extract all fields from the event payload (forwarded by Ingestion Lambda)
-        payload      = event.get("payload", event)   # support both wrapped and flat
-        diff         = payload.get("diff") or event.get("diff") or "diff --git a/file.txt b/file.txt\n..."
-        commit_hash  = payload.get("commitHash") or event.get("commitHash", None)
-        branch       = event.get("branch", "main")
-        author       = payload.get("author") or event.get("author", "unknown")
-        timestamp    = event.get("timestamp", datetime.utcnow().isoformat() + "Z")
-        parent_branch = event.get("parentBranch", None)
-        changed_files = payload.get("changedFiles", [])
-        message       = payload.get("message") or event.get("message", "")
+        response = table.get_item(Key={'idempotencyKey': idempotency_key})
+        item = response.get('Item')
+        if item:
+            status = item.get('status')
+            # Handle stale PROCESSING records: if PROCESSING for > 10 minutes, allow reprocessing
+            if status == 'PROCESSING':
+                started_at_str = item.get('startedAt')
+                if started_at_str:
+                    try:
+                        started_at = datetime.fromisoformat(started_at_str.replace('Z', '+00:00'))
+                        now = datetime.now(timezone.utc)
+                        if (now - started_at).total_seconds() > 600:  # 10 minute lease
+                            print(f"[idempotency] Stale PROCESSING record detected for key: {idempotency_key}, allowing reprocessing")
+                            return False, None
+                    except Exception:
+                        pass  # If parsing fails, treat as normal duplicate
+                print(f"[idempotency] Duplicate detected for key: {idempotency_key}")
+                return True, item
+            # For COMPLETED, FAILED, or any other final status, treat as duplicate
+            print(f"[idempotency] Duplicate detected for key: {idempotency_key} (status: {status})")
+            return True, item
+        return False, None
+    except ClientError as e:
+        print(f"[idempotency] Error checking idempotency: {str(e)}")
+        return False, None
 
-        event_data = {
-            "diff": diff, "commitHash": commit_hash, "message": message,
-            "author": author, "branch": branch, "changedFiles": changed_files
-        }
+def claim_idempotency(idempotency_key: str, event_data: dict) -> bool:
+    """
+    Atomically claim an idempotency key for processing.
+    Returns True if claim succeeded, False if already claimed.
+    """
+    table = dynamodb.Table(IDEMPOTENCY_TABLE)
+    timestamp = datetime.utcnow().isoformat() + 'Z'
+    expires_at = int(time.time()) + IDEMPOTENCY_TTL_SECONDS
+    
+    try:
+        table.put_item(
+            Item={
+                'idempotencyKey': idempotency_key,
+                'status': 'PROCESSING',
+                'eventData': event_data,
+                'startedAt': timestamp,
+                'expiresAt': expires_at,
+            },
+            ConditionExpression='attribute_not_exists(idempotencyKey)'
+        )
+        return True
+    except ClientError as e:
+        if e.response['Error']['Code'] == 'ConditionalCheckFailedException':
+            print(f"[idempotency] Key already claimed: {idempotency_key}")
+            return False
+        print(f"[idempotency] Error claiming idempotency: {str(e)}")
+        return False
 
-        # Direction B: Check for orphaned record if this is a commit event
-        if commit_hash:
-            orphaned = find_orphaned_record(project_id, branch, author, timestamp)
-            if orphaned:
-                # Update existing record with commitHash instead of creating new one
-                update_orphaned_record(orphaned['eventId'], commit_hash, timestamp)
-                
-                # Write audit record
-                audit_record = {
-                    "entityId": orphaned['eventId'],
-                    "action": "commit_linked",
-                    "timestamp": timestamp,
-                    "projectId": project_id,
-                    "branch": branch,
-                    "author": author
-                }
-                write_audit_record(audit_record)
-                
-                # Update project activity
-                update_project_activity(project_id, timestamp)
-                
-                return {
-                    "statusCode": 200,
-                    "headers": {"Content-Type": "application/json"},
-                    "body": json.dumps({
-                        "message": "Orphaned record updated with commitHash",
-                        "eventId": orphaned['eventId']
-                    })
-                }
+def complete_idempotency(idempotency_key: str, result: dict):
+    """Mark idempotency record as completed with result."""
+    table = dynamodb.Table(IDEMPOTENCY_TABLE)
+    try:
+        table.update_item(
+            Key={'idempotencyKey': idempotency_key},
+            UpdateExpression='SET #status = :status, completedAt = :ts, result = :result',
+            ExpressionAttributeNames={'#status': 'status'},
+            ExpressionAttributeValues={
+                ':status': 'COMPLETED',
+                ':ts': datetime.utcnow().isoformat() + 'Z',
+                ':result': result,
+            }
+        )
+    except ClientError as e:
+        print(f"[idempotency] Error completing idempotency: {str(e)}")
 
-        # Call Bedrock for extraction
-        t_handler_start = time.time()
-        extraction = call_bedrock(event_data)
-        bedrock_ms = extraction.pop('_bedrock_duration_ms', 0)
-        validate_extraction_schema(extraction)
-        extraction['confidence'] = compute_confidence(extraction)
+def fail_idempotency(idempotency_key: str, error: str):
+    """Mark idempotency record as failed."""
+    table = dynamodb.Table(IDEMPOTENCY_TABLE)
+    try:
+        table.update_item(
+            Key={'idempotencyKey': idempotency_key},
+            UpdateExpression='SET #status = :status, failedAt = :ts, error = :error',
+            ExpressionAttributeNames={'#status': 'status'},
+            ExpressionAttributeValues={
+                ':status': 'FAILED',
+                ':ts': datetime.utcnow().isoformat() + 'Z',
+                ':error': error,
+            }
+        )
+    except ClientError as e:
+        print(f"[idempotency] Error failing idempotency: {str(e)}")
 
-        # Generate Titan embedding
-        embedding_input = json.dumps(extraction)
-        embedding, embedding_ms = call_titan_embedding(embedding_input)
-        total_ms = int((time.time() - t_handler_start) * 1000)
 
-        # Build context record — matches flowsync-context schema exactly
-        context_record = {
-            "eventId":            event.get("eventId", "test-event"),
-            "projectId":          project_id,
-            "branch":             branch,
-            "branchExtractedAt":  f"{branch}#{timestamp}",   # BranchContextIndex GSI SK
-            "parentBranch":       parent_branch,
-            "commitHash":         commit_hash,
-            "status":             "complete" if commit_hash else "uncommitted",
-            "feature":            extraction["feature"],
-            "decision":           extraction["decision"],
-            "tasks":              extraction["tasks"],
-            "stage":              extraction["stage"],
-            "risk":               extraction["risk"],
-            "confidence":         extraction["confidence"],
-            "entities":           extraction["entities"],
-            "author":             author,
-            "agentReasoning":     None,
-            "modelVersion":       MODEL_ID,
-            "embedding":          embedding,
-            "extractedAt":        timestamp,
-            "processingDuration": total_ms
-        }
-        write_context_record(context_record)
+# ─────────────────────────────────────────────────────────────────────────────
+# STRUCTURED LOGGING WITH CORRELATION ID
+# ─────────────────────────────────────────────────────────────────────────────
 
-        # Emit structured benchmark log — parsed by the benchmark agent
-        print(json.dumps({
-            "BENCHMARK_LOG": True,
-            "eventId":        context_record["eventId"],
-            "projectId":      project_id,
-            "branch":         branch,
-            "author":         author,
-            "bedrock_ms":     bedrock_ms,
-            "embedding_ms":   embedding_ms,
-            "total_ms":       total_ms,
-            "diff_chars":     len(diff),
-            "confidence":     float(extraction["confidence"]),
-            "has_decision":   extraction["decision"] is not None,
-            "has_risk":       extraction["risk"] is not None,
-            "tasks_count":    len(extraction["tasks"]),
-            "entities_count": len(extraction["entities"]),
-            "timestamp":      timestamp
-        }))
+def log_structured(level: str, message: str, correlation_id: str = None, **kwargs):
+    """Log a structured JSON entry with correlation ID."""
+    entry = {
+        'timestamp': datetime.utcnow().isoformat() + 'Z',
+        'level': level,
+        'message': message,
+        'correlationId': correlation_id,
+        **kwargs,
+    }
+    print(json.dumps(entry))
 
-        # Write audit record
-        audit_record = {
-            "entityId": context_record["eventId"],
-            "action": "context_extracted",
-            "timestamp": timestamp,
-            "projectId": project_id,
-            "branch": branch,
-            "author": author
-        }
-        write_audit_record(audit_record)
+def log_error(correlation_id: str, message: str, error: Exception, **kwargs):
+    log_structured('ERROR', message, correlation_id, error={
+        'name': type(error).__name__,
+        'message': str(error),
+    }, **kwargs)
 
-        # Update project activity
-        update_project_activity(project_id, timestamp)
+def log_info(correlation_id: str, message: str, **kwargs):
+    log_structured('INFO', message, correlation_id, **kwargs)
 
+def log_warn(correlation_id: str, message: str, **kwargs):
+    log_structured('WARN', message, correlation_id, **kwargs)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CORE PROCESSING FUNCTIONS
+# ─────────────────────────────────────────────────────────────────────────────
+
+def process_event_record(record: dict, correlation_id: str) -> dict:
+    """
+    Process a single event record from SQS.
+    Returns the processing result.
+    """
+    # Extract message body
+    try:
+        body = json.loads(record.get('body', '{}'))
+    except json.JSONDecodeError:
+        raise ValueError("Invalid JSON in SQS message body")
+    
+    event_id = body.get('eventId')
+    project_id = body.get('projectId')
+    event_type = body.get('eventType')
+    branch = body.get('branch')
+    parent_branch = body.get('parentBranch')
+    payload = body.get('payload', {})
+    timestamp = body.get('timestamp', datetime.utcnow().isoformat() + 'Z')
+    delivery_id = body.get('deliveryId')
+    
+    # Build idempotency key - use deliveryId for GitHub events, eventId otherwise
+    idempotency_key = delivery_id or event_id
+    if not idempotency_key:
+        raise ValueError("Event missing both eventId and deliveryId")
+    
+    # Check idempotency
+    is_duplicate, existing = check_idempotency(idempotency_key)
+    if is_duplicate:
+        log_info(correlation_id, "Duplicate event detected, skipping", 
+                 idempotencyKey=idempotency_key, existingStatus=existing.get('status'))
         return {
-            "statusCode": 200,
-            "headers": {"Content-Type": "application/json"},
-            "body": json.dumps({"message": "Context record written", "eventId": context_record["eventId"]})
+            'status': 'duplicate',
+            'eventId': event_id,
+            'idempotencyKey': idempotency_key,
         }
-    except ValueError as e:
-        # Schema validation or embedding failure
-        print(f"SCHEMA_VALIDATION_ERROR: {str(e)}")
-        publish_cloudwatch_metric('SchemaValidationFailure', 1, project_id)
-        
-        # Mark event as failed
-        failed_record = {
-            "eventId": event.get("eventId", "test-event"),
-            "projectId": project_id,
-            "status": "failed",
-            "error": str(e),
-            "timestamp": event.get("timestamp", "2026-03-01T00:00:00Z")
-        }
-        write_context_record(failed_record)
-        
+    
+    # Claim idempotency
+    event_data = {
+        'eventId': event_id,
+        'projectId': project_id,
+        'eventType': event_type,
+        'branch': branch,
+        'timestamp': timestamp,
+    }
+    if not claim_idempotency(idempotency_key, event_data):
+        # Another process claimed it - treat as duplicate
+        log_info(correlation_id, "Event claimed by another processor, skipping",
+                 idempotencyKey=idempotency_key)
         return {
-            "statusCode": 500,
-            "headers": {"Content-Type": "application/json"},
-            "body": json.dumps({"error": f"Schema validation failed: {str(e)}"})
+            'status': 'duplicate',
+            'eventId': event_id,
+            'idempotencyKey': idempotency_key,
         }
+    
+    try:
+        # Process the event
+        result = process_event(body, correlation_id)
+        
+        # Mark as completed
+        complete_idempotency(idempotency_key, {'status': 'success', 'result': result})
+        return result
     except Exception as e:
-        print(f"Error in AI Processing Lambda: {str(e)}")
-        publish_cloudwatch_metric('ProcessingFailure', 1, project_id)
+        fail_idempotency(idempotency_key, str(e))
+        raise
+
+def process_event(event_data: dict, correlation_id: str) -> dict:
+    """Process a single event (core logic extracted from original handler)."""
+    project_id = event_data.get("projectId", "test-project")
+    event_id = event_data.get("eventId", "test-event")
+    event_type = event_data.get("eventType")
+    branch = event_data.get("branch", "main")
+    timestamp = event_data.get("timestamp", datetime.utcnow().isoformat() + "Z")
+    parent_branch = event_data.get("parentBranch")
+    payload = event_data.get("payload", event_data)
+    
+    diff         = payload.get("diff", "")
+    commit_hash  = payload.get("commitHash")
+    message      = payload.get("message", "")
+    author       = payload.get("author", "unknown")
+    changed_files = payload.get("changedFiles", [])
+
+    # Handle merge propagation
+    if event_data.get('propagate'):
+        source_branch = event_data.get('sourceBranch')
+        target_branch = event_data.get('targetBranch')
+        if not source_branch or not target_branch:
+            raise ValueError('sourceBranch and targetBranch required for propagation')
+        count = propagate_branch_context(project_id, source_branch, target_branch, timestamp)
+        update_project_activity(project_id, timestamp)
+        return {'status': 'propagated', 'count': count, 'from': source_branch, 'to': target_branch}
+
+    log_info(correlation_id, "Processing event", eventId=event_id, eventType=event_type, branch=branch)
+
+    # Direction B: Check for orphaned record if this is a commit event
+    if commit_hash:
+        orphaned = find_orphaned_record(project_id, branch, author, timestamp)
+        if orphaned:
+            update_orphaned_record(orphaned['eventId'], commit_hash, timestamp)
+            
+            audit_record = {
+                "entityId": orphaned['eventId'],
+                "action": "commit_linked",
+                "timestamp": timestamp,
+                "projectId": project_id,
+                "branch": branch,
+                "author": author
+            }
+            write_audit_record(audit_record)
+            update_project_activity(project_id, timestamp)
+            
+            return {
+                "status": "orphaned_updated",
+                "eventId": orphaned['eventId'],
+                "message": "Orphaned record updated with commitHash"
+            }
+
+    # Call Bedrock for extraction
+    t_handler_start = time.time()
+    event_data_for_bedrock = {
+        "diff": diff, "commitHash": commit_hash, "message": message,
+        "author": author, "branch": branch, "changedFiles": changed_files
+    }
+    extraction = call_bedrock(event_data_for_bedrock)
+    bedrock_ms = extraction.pop('_bedrock_duration_ms', 0)
+    validate_extraction_schema(extraction)
+    extraction['confidence'] = compute_confidence(extraction)
+
+    # Generate Titan embedding
+    embedding_input = json.dumps(extraction)
+    embedding, embedding_ms = call_titan_embedding(embedding_input)
+    total_ms = int((time.time() - t_handler_start) * 1000)
+
+    # Build context record
+    context_record = {
+        "eventId":            event_id,
+        "projectId":          project_id,
+        "branch":             branch,
+        "branchExtractedAt":  f"{branch}#{timestamp}",
+        "parentBranch":       parent_branch,
+        "commitHash":         commit_hash,
+        "status":             "complete" if commit_hash else "uncommitted",
+        "feature":            extraction["feature"],
+        "decision":           extraction["decision"],
+        "tasks":              extraction["tasks"],
+        "stage":              extraction["stage"],
+        "risk":               extraction["risk"],
+        "confidence":         extraction["confidence"],
+        "entities":           extraction["entities"],
+        "author":             author,
+        "agentReasoning":     None,
+        "modelVersion":       MODEL_ID,
+        "embedding":          embedding,
+        "extractedAt":        timestamp,
+        "processingDuration": total_ms
+    }
+    write_context_record(context_record)
+
+    # Benchmark log
+    print(json.dumps({
+        "BENCHMARK_LOG": True,
+        "eventId":        context_record["eventId"],
+        "projectId":      project_id,
+        "branch":         branch,
+        "author":         author,
+        "bedrock_ms":     bedrock_ms,
+        "embedding_ms":   embedding_ms,
+        "total_ms":       total_ms,
+        "diff_chars":     len(diff),
+        "confidence":     float(extraction["confidence"]),
+        "has_decision":   extraction["decision"] is not None,
+        "has_risk":       extraction["risk"] is not None,
+        "tasks_count":    len(extraction["tasks"]),
+        "entities_count": len(extraction["entities"]),
+        "timestamp":      timestamp
+    }))
+
+    # Audit record
+    audit_record = {
+        "entityId": context_record["eventId"],
+        "action": "context_extracted",
+        "timestamp": timestamp,
+        "projectId": project_id,
+        "branch": branch,
+        "author": author
+    }
+    write_audit_record(audit_record)
+
+    update_project_activity(project_id, timestamp)
+
+    return {
+        "status": "success",
+        "eventId": context_record["eventId"],
+        "message": "Context record written"
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SQS BATCH HANDLER
+# ─────────────────────────────────────────────────────────────────────────────
+
+def handler(event, context):
+    """
+    Main handler for SQS event source mapping.
+    Processes batch of records with partial failure reporting.
+    """
+    print("AI Processing Lambda invoked", json.dumps(event, default=str))
+    
+    records = event.get('Records', [])
+    if not records:
+        log_warn(None, "No records in SQS event")
+        return {'batchItemFailures': []}
+    
+    batch_item_failures = []
+    
+    for record in records:
+        # Extract correlation ID from message attributes
+        message_attrs = record.get('messageAttributes', {})
+        correlation_id = message_attrs.get('correlationId', {}).get('stringValue')
+        if not correlation_id:
+            correlation_id = record.get('messageId', 'unknown')
         
-        return {
-            "statusCode": 500,
-            "headers": {"Content-Type": "application/json"},
-            "body": json.dumps({"error": str(e)})
-        }
+        log_info(correlation_id, "Processing SQS record", messageId=record.get('messageId'))
+        
+        try:
+            # Check if this is a merge propagation message
+            body = json.loads(record.get('body', '{}'))
+            if body.get('propagate'):
+                # Handle merge propagation
+                project_id = body.get('projectId', 'test-project')
+                source_branch = body.get('sourceBranch')
+                target_branch = body.get('targetBranch')
+                timestamp = body.get('timestamp', datetime.utcnow().isoformat() + 'Z')
+                if not source_branch or not target_branch:
+                    raise ValueError('sourceBranch and targetBranch required for propagation')
+                count = propagate_branch_context(project_id, source_branch, target_branch, timestamp)
+                update_project_activity(project_id, timestamp)
+                log_info(correlation_id, "Merge propagation completed", 
+                         count=count, fromBranch=source_branch, toBranch=target_branch)
+                continue
+            
+            # Process regular event with idempotency
+            result = process_event_record(record, correlation_id)
+            
+            if result.get('status') == 'duplicate':
+                log_info(correlation_id, "Skipped duplicate event", 
+                         eventId=result.get('eventId'))
+            else:
+                log_info(correlation_id, "Event processed successfully", 
+                         eventId=result.get('eventId'), status=result.get('status'))
+            
+        except Exception as e:
+            log_error(correlation_id, "Failed to process record", e, messageId=record.get('messageId'))
+            batch_item_failures.append({'itemIdentifier': record.get('messageId')})
+    
+    return {'batchItemFailures': batch_item_failures}

@@ -2,7 +2,7 @@ import * as http from "http";
 import * as net from "net";
 import { log } from "./logger";
 
-type HookCallback = (branch: string, remoteRef?: string) => void;
+export type HookCallback = (branch: string, remoteRef?: string) => void;
 
 let server: http.Server | null = null;
 let activePort: number | null = null;
@@ -26,7 +26,7 @@ export async function findAvailablePort(preferredPort: number): Promise<number> 
     }
     log.info("findAvailablePort", `port ${p} is taken, trying next`);
   }
-  throw new Error(`BuildBerry: no available port found in range ${preferredPort}–${preferredPort + 99}`);
+  throw new Error(`FlowSync: no available port found in range ${preferredPort}–${preferredPort + 99}`);
 }
 
 export async function startHookListener(

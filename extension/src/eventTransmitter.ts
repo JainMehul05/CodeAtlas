@@ -1,32 +1,55 @@
 import * as https from "https";
 import * as http from "http";
 import { log } from "./logger";
+import {
+  FlowSyncEvent,
+  EventType,
+  EventSource,
+  PushEventPayload,
+  createEvent,
+  validateEvent,
+  isPushPayload,
+} from "@flowsync/shared";
 
-export interface CapturedEvent {
-  eventId: string;
-  projectId: string;
-  eventType: "push" | "developer_note";
-  timestamp: string;
-  branch: string;
-  payload: PushPayload;
-}
+export type CapturedEvent = FlowSyncEvent;
 
-export interface PushPayload {
-  commitHash: string;
-  message: string;
-  diff: string;
-  author: string;
-  parentBranch?: string;
-  isMerge?: boolean;
-  sourceBranch?: string;
+export type PushPayload = PushEventPayload;
+
+export function createPushEvent(
+  projectId: string,
+  actor: { id: string; name: string; email?: string; avatarUrl?: string },
+  payload: PushEventPayload,
+  options?: {
+    branch?: string;
+    correlationId?: string;
+  }
+): FlowSyncEvent {
+  return createEvent(
+    EventType.PUSH,
+    EventSource.VSCODE,
+    projectId,
+    actor,
+    payload,
+    {
+      correlationId: options?.correlationId,
+    }
+  );
 }
 
 export async function transmitEvent(
   backendUrl: string,
   apiToken: string,
-  event: CapturedEvent
+  event: FlowSyncEvent
 ): Promise<Record<string, unknown>> {
+  const validation = validateEvent(event);
+  if (!validation.success) {
+    throw new Error(`Event validation failed: ${validation.errors?.map((e) => e.message).join(", ")}`);
+  }
+
   const retryDelays = [0, 1000, 2000, 4000];
+
+  // Extract branch from payload for push events
+  const branch = isPushPayload(event.payload) ? event.payload.branch : undefined;
 
   for (let attempt = 0; attempt < retryDelays.length; attempt++) {
     if (retryDelays[attempt] > 0) {
@@ -34,8 +57,11 @@ export async function transmitEvent(
       await sleep(retryDelays[attempt]);
     }
 
+    const commitHash = isPushPayload(event.payload) ? event.payload.commitHash : undefined;
+    const author = isPushPayload(event.payload) ? event.payload.author : undefined;
+    
     log.step("transmitEvent", `attempt ${attempt + 1}/${retryDelays.length} → POST ${backendUrl}/api/v1/events`);
-    log.info("transmitEvent", `payload summary: eventId=${event.eventId} projectId=${event.projectId} branch=${event.branch} commitHash=${event.payload.commitHash.slice(0, 8)} author="${event.payload.author}" diffLen=${event.payload.diff.length}`);
+    log.info("transmitEvent", `payload summary: eventId=${event.eventId} projectId=${event.projectId} branch=${branch ?? 'N/A'} commitHash=${commitHash?.slice(0, 8)} author="${author ?? 'unknown'}"`);
 
     try {
       const result = await postJson(
@@ -55,7 +81,7 @@ export async function transmitEvent(
     }
   }
 
-  throw new Error("BuildBerry: transmit failed after all retries");
+  throw new Error("FlowSync: transmit failed after all retries");
 }
 
 function postJson(

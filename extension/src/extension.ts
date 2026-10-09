@@ -4,7 +4,7 @@ import * as path from "path";
 import { readConfig, writeConfig, getWorkspaceRoot } from "./config";
 import { startHookListener, stopHookListener } from "./hookListener";
 import { getDiff, getLastCommitInfo, getGitUserName, getMergeInfo } from "./gitUtils";
-import { transmitEvent, CapturedEvent } from "./eventTransmitter";
+import { transmitEvent, createPushEvent } from "./eventTransmitter";
 import { showPostPushNotification } from "./notifications";
 import { FlowSyncPanel } from "./panels/FlowSyncPanel";
 import { initLogger, log } from "./logger";
@@ -14,6 +14,7 @@ import { registerJoinCommand } from "./commands/joinProject";
 import { registerRecordReasoningCommand } from "./commands/recordReasoning";
 import { registerOpenWebDashboardCommand } from "./commands/openWebDashboard";
 import { FlowSyncSidebar } from "./panels/FlowSyncSidebar";
+import { Actor, EventSource } from "@flowsync/shared";
 
 const CONFIG_SECTION = "flowsync";
 
@@ -126,7 +127,7 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("flowsync.openChat", () => openPanel("chat")),
     vscode.commands.registerCommand("flowsync.refresh", async () => {
       await syncState();
-      vscode.window.setStatusBarMessage("$(check) BuildBerry status refreshed", 3000);
+      vscode.window.setStatusBarMessage("$(check) FlowSync status refreshed", 3000);
     }),
     vscode.commands.registerCommand("flowsync.openOutput", () => {
       outputChannel.show(true);
@@ -279,22 +280,22 @@ async function handlePushEvent(
 
   log.ok("handlePushEvent", `commit=${commitInfo.commitHash.slice(0, 8)} author="${commitInfo.author}" message="${commitInfo.message}" diffLen=${diff.length}`);
 
-  const event: CapturedEvent = {
-    eventId: crypto.randomUUID(),
-    projectId,
-    eventType: "push",
-    timestamp: new Date().toISOString(),
-    branch,
-    payload: {
-      commitHash: commitInfo.commitHash,
-      message: commitInfo.message,
-      diff,
-      author: commitInfo.author,
-      parentBranch: defaultBranch !== branch ? defaultBranch : undefined,
-      isMerge: mergeInfo.isMerge || undefined,
-      sourceBranch: mergeInfo.isMerge && mergeInfo.sourceBranch ? mergeInfo.sourceBranch : undefined,
-    },
+  const actor: Actor = {
+    id: gitUserName ?? commitInfo.author,
+    name: gitUserName ?? commitInfo.author,
   };
+
+  const pushPayload = {
+    commitHash: commitInfo.commitHash,
+    message: commitInfo.message,
+    diff,
+    author: commitInfo.author,
+    parentBranch: defaultBranch !== branch ? defaultBranch : undefined,
+    isMerge: mergeInfo.isMerge || undefined,
+    sourceBranch: mergeInfo.isMerge && mergeInfo.sourceBranch ? mergeInfo.sourceBranch : undefined,
+  };
+
+  const event = createPushEvent(projectId, actor, pushPayload, { branch });
 
   log.step("handlePushEvent", `transmitting eventId=${event.eventId} to ${backendUrl}`);
 

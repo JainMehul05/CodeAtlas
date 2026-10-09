@@ -12,6 +12,7 @@
     "dev": "node --import tsx/esm --watch src/index.ts"
   },
   "dependencies": {
+    "@flowsync/shared": "file:../packages/flowsync-shared",
     "@modelcontextprotocol/sdk": "^1.12.0",
     "zod": "^3.25.28"
   },

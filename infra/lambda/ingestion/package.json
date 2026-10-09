@@ -1,0 +1,26 @@
+{
+  "name": "flowsync-ingestion-lambda",
+  "version": "1.0.0",
+  "description": "FlowSync Ingestion Lambda — validates and stores events, triggers AI processing",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "esbuild index.ts --bundle --platform=node --target=node20 --format=cjs --outfile=dist/index.js --external:@aws-sdk/*",
+    "prepare": "npm run build",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@aws-sdk/client-sqs": "^3.1148.0",
+    "@flowsync/shared": "file:../../../packages/flowsync-shared"
+  },
+  "devDependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1148.0",
+    "@aws-sdk/client-s3": "^3.1148.0",
+    "@aws-sdk/lib-dynamodb": "^3.1148.0",
+    "@types/jest": "^29.5.0",
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.25.12",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.0",
+    "typescript": "^5.9.3"
+  }
+}

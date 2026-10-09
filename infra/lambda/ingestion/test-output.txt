@@ -1,0 +1,117 @@
+
+> flowsync-ingestion-lambda@1.0.0 test
+> jest
+
+ts-jest[ts-jest-transformer] (WARN) Define `ts-jest` config under `globals` is deprecated. Please do
+transform: {
+    <transform_regex>: ['ts-jest', { /* ts-jest config goes here in Jest */ }],
+},
+See more at https://kulshekhar.github.io/ts-jest/docs/getting-started/presets#advanced
+  console.log
+    [SQS] Event 550e8400-e29b-41d4-a716-446655440000 sent to processing queue
+
+      at handleApiEvent (index.ts:329:13)
+
+  console.log
+    {"INGESTION_TIMING":true,"eventId":"550e8400-e29b-41d4-a716-446655440000","ingestion_ms":37,"receivedAt":"2026-10-09T10:27:07.328Z","correlationId":"corr-123"}
+
+      at handleApiEvent (index.ts:385:11)
+
+  console.error
+    [fatal] SQS send failed: SQS unavailable
+
+    [0m [90m 329 |[39m     console[33m.[39mlog([32m`[SQS] Event ${event.eventId} sent to processing queue`[39m)[33m;[39m
+     [90m 330 |[39m   } [36mcatch[39m (err) {
+    [31m[1m>[22m[39m[90m 331 |[39m     console[33m.[39merror([32m'[fatal] SQS send failed:'[39m[33m,[39m (err [36mas[39m [33mError[39m)[33m.[39mmessage)[33m;[39m
+     [90m     |[39m             [31m[1m^[22m[39m
+     [90m 332 |[39m     [36mreturn[39m respond([35m500[39m[33m,[39m { error[33m:[39m [32m'queue_failed'[39m[33m,[39m message[33m:[39m [32m'Failed to queue event for processing'[39m }[33m,[39m correlationId)[33m;[39m
+     [90m 333 |[39m   }
+     [90m 334 |[39m[0m
+
+      at handleApiEvent (index.ts:331:13)
+      at Object.<anonymous> (test/ingestion.test.ts:201:22)
+
+  console.log
+    [SQS] GitHub webhook event delivery-123 sent to processing queue
+
+      at handleGitHubWebhook (index.ts:588:13)
+
+  console.log
+    [SQS] GitHub webhook event github-delivery-456 sent to processing queue
+
+      at handleGitHubWebhook (index.ts:588:13)
+
+  console.error
+    [fatal] GITHUB_WEBHOOK_SECRET not configured
+
+    [0m [90m 418 |[39m   [36mconst[39m webhookSecret [33m=[39m process[33m.[39menv[33m.[39m[33mGITHUB_WEBHOOK_SECRET[39m[33m;[39m
+     [90m 419 |[39m   [36mif[39m ([33m![39mwebhookSecret) {
+    [31m[1m>[22m[39m[90m 420 |[39m     console[33m.[39merror([32m'[fatal] GITHUB_WEBHOOK_SECRET not configured'[39m)[33m;[39m
+     [90m     |[39m             [31m[1m^[22m[39m
+     [90m 421 |[39m     [36mreturn[39m respond([35m500[39m[33m,[39m { error[33m:[39m [32m'configuration_error'[39m[33m,[39m message[33m:[39m [32m'Webhook secret not configured'[39m }[33m,[39m correlationId)[33m;[39m
+     [90m 422 |[39m   }
+     [90m 423 |[39m[0m
+
+      at handleGitHubWebhook (index.ts:420:13)
+      at Object.<anonymous> (test/ingestion.test.ts:308:28)
+
+  console.log
+    [SQS] Event 550e8400-e29b-41d4-a716-446655440000 sent to processing queue
+
+      at handleApiEvent (index.ts:329:13)
+
+  console.log
+    {"INGESTION_TIMING":true,"eventId":"550e8400-e29b-41d4-a716-446655440000","ingestion_ms":1,"receivedAt":"2026-10-09T10:27:07.393Z","correlationId":"custom-corr-id"}
+
+      at handleApiEvent (index.ts:385:11)
+
+  console.log
+    [SQS] Event 550e8400-e29b-41d4-a716-446655440000 sent to processing queue
+
+      at handleApiEvent (index.ts:329:13)
+
+  console.log
+    {"INGESTION_TIMING":true,"eventId":"550e8400-e29b-41d4-a716-446655440000","ingestion_ms":1,"receivedAt":"2026-10-09T10:27:07.395Z","correlationId":"550e8400-e29b-41d4-a716-446655440000"}
+
+      at handleApiEvent (index.ts:385:11)
+
+  console.log
+    [SQS] Event 550e8400-e29b-41d4-a716-446655440000 sent to processing queue
+
+      at handleApiEvent (index.ts:329:13)
+
+  console.log
+    [SQS] Merge propagation queued: feature/test ΓåÆ main
+
+      at handleApiEvent (index.ts:361:15)
+
+  console.log
+    {"INGESTION_TIMING":true,"eventId":"550e8400-e29b-41d4-a716-446655440000","ingestion_ms":1,"receivedAt":"2026-10-09T10:27:07.397Z","correlationId":"corr-123"}
+
+      at handleApiEvent (index.ts:385:11)
+
+PASS test/ingestion.test.ts
+  Ingestion Lambda - Phase 2
+    SQS Enqueue
+      ΓêÜ should send validated event to SQS queue (46 ms)
+      ΓêÜ should reject malformed event before SQS enqueue (1 ms)
+      ΓêÜ should return 500 when SQS send fails (8 ms)
+    GitHub Webhook
+      ΓêÜ should verify valid HMAC-SHA256 signature (2 ms)
+      ΓêÜ should reject invalid signature (1 ms)
+      ΓêÜ should reject missing signature
+      ΓêÜ should reject missing delivery ID
+      ΓêÜ should use GitHub delivery ID as event ID for idempotency (1 ms)
+      ΓêÜ should reject unsupported event types (1 ms)
+      ΓêÜ should reject when webhook secret not configured (8 ms)
+    Correlation ID Propagation
+      ΓêÜ should preserve correlation ID through SQS message attributes (3 ms)
+      ΓêÜ should generate correlation ID when not provided (2 ms)
+    Merge Propagation
+      ΓêÜ should send separate SQS message for merge propagation (3 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       13 passed, 13 total
+Snapshots:   0 total
+Time:        1.437 s, estimated 2 s
+Ran all test suites.

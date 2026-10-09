@@ -45,7 +45,7 @@ export function buildWebviewHtml(
                img-src ${webview.cspSource} data:;">
     <link rel="stylesheet" href="${styleUri}">
     <script nonce="${nonce}">window.__FLOWSYNC_LOGO__ = "${logoUri}";</script>
-    <title>BuildBerry</title>
+    <title>FlowSync</title>
   </head>
   <body>
     <div id="root"></div>

@@ -56,7 +56,7 @@ export function JoinProject({ onNavigate }: JoinProjectProps) {
           </div>
           <h2>Connected</h2>
           <p className="success-message">
-            BuildBerry is now active. Your pushes will be captured automatically.
+            FlowSync is now active. Your pushes will be captured automatically.
           </p>
           <button className="btn btn-primary" onClick={() => onNavigate("dashboard")}>
             Go to Dashboard
@@ -87,7 +87,7 @@ export function JoinProject({ onNavigate }: JoinProjectProps) {
           <input
             id="api-token"
             type="password"
-            placeholder="Paste your BuildBerry API token"
+            placeholder="Paste your FlowSync API token"
             value={token}
             onChange={(e) => {
               setToken(e.target.value);
