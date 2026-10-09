@@ -109,7 +109,76 @@ export class InfraStack extends cdk.Stack {
       timeToLiveAttribute: 'expiresAt', // auto-expire after 7 days
     });
 
-    const allTables = [projectsTable, eventsTable, contextTable, auditTable, chatSessionsTable, cacheTable, idempotencyTable];
+    // ─────────────────────────────────────────────
+    // GRAPH TABLES (Phase 3 - Engineering Knowledge Graph)
+    // ─────────────────────────────────────────────
+    
+    // Graph Entities table - stores all graph entities (repositories, commits, PRs, files, decisions)
+    const graphEntitiesTable = new dynamodb.Table(this, 'FlowSyncGraphEntities', {
+      tableName: 'flowsync-graph-entities',
+      partitionKey: { name: 'entityId', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+    // GSI: Query entities by project and type
+    graphEntitiesTable.addGlobalSecondaryIndex({
+      indexName: 'ProjectEntityIndex',
+      partitionKey: { name: 'projectId', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'entityType#createdAt', type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+    // GSI: Query entities by repository
+    graphEntitiesTable.addGlobalSecondaryIndex({
+      indexName: 'RepositoryEntityIndex',
+      partitionKey: { name: 'repositoryId', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'entityType#createdAt', type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+    // GSI: Query entities by type (for cross-project analytics)
+    graphEntitiesTable.addGlobalSecondaryIndex({
+      indexName: 'EntityTypeIndex',
+      partitionKey: { name: 'entityType', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'createdAt', type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
+    // Graph Relationships table - stores all relationships between entities
+    const graphRelationshipsTable = new dynamodb.Table(this, 'FlowSyncGraphRelationships', {
+      tableName: 'flowsync-graph-relationships',
+      partitionKey: { name: 'relationshipId', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+    // GSI: Query outgoing relationships from an entity
+    graphRelationshipsTable.addGlobalSecondaryIndex({
+      indexName: 'SourceEntityIndex',
+      partitionKey: { name: 'sourceEntityId', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'relationshipType#createdAt', type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+    // GSI: Query incoming relationships to an entity
+    graphRelationshipsTable.addGlobalSecondaryIndex({
+      indexName: 'TargetEntityIndex',
+      partitionKey: { name: 'targetEntityId', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'relationshipType#createdAt', type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+    // GSI: Query relationships by project
+    graphRelationshipsTable.addGlobalSecondaryIndex({
+      indexName: 'ProjectRelationshipIndex',
+      partitionKey: { name: 'projectId', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'relationshipType#createdAt', type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+    // GSI: Query relationships by type
+    graphRelationshipsTable.addGlobalSecondaryIndex({
+      indexName: 'RelationshipTypeIndex',
+      partitionKey: { name: 'relationshipType', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'createdAt', type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
+    const allTables = [projectsTable, eventsTable, contextTable, auditTable, chatSessionsTable, cacheTable, idempotencyTable, graphEntitiesTable, graphRelationshipsTable];
 
     // ─────────────────────────────────────────────
     // S3 BUCKETS
@@ -213,6 +282,8 @@ export class InfraStack extends cdk.Stack {
         CONTEXT_TABLE: contextTable.tableName,
         AUDIT_TABLE: auditTable.tableName,
         IDEMPOTENCY_TABLE: idempotencyTable.tableName,
+        GRAPH_ENTITIES_TABLE: graphEntitiesTable.tableName,
+        GRAPH_RELATIONSHIPS_TABLE: graphRelationshipsTable.tableName,
         FALLBACK_MODEL_ID: 'us.amazon.nova-lite-v1:0',
       },
     });

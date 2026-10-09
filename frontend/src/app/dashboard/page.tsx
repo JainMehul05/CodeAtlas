@@ -5,20 +5,22 @@ import { useAppContext } from '@/hooks/useAppContext';
 import { Timeline } from '@/components/dashboard/Timeline';
 import { ProjectSummary } from '@/components/dashboard/ProjectSummary';
 import { BranchCompare } from '@/components/dashboard/BranchCompare';
+import { GraphExplorer } from '@/components/dashboard/GraphExplorer';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { LoadingCards } from '@/components/shared/LoadingSpinner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Segmented, type SegmentedOption } from '@/components/ui/segmented';
-import { GitBranch, GitCommitHorizontal, LayoutDashboard, List } from 'lucide-react';
+import { GitBranch, GitCommitHorizontal, LayoutDashboard, List, GitGraph } from 'lucide-react';
 
-type Tab = 'summary' | 'timeline' | 'compare';
+type Tab = 'summary' | 'timeline' | 'compare' | 'graph';
 
 const tabs: SegmentedOption<Tab>[] = [
   { value: 'summary', label: 'Summary', icon: LayoutDashboard, pastel: 'bg-pastel-dashboard' },
   { value: 'timeline', label: 'Timeline', icon: List, pastel: 'bg-pastel-timeline' },
   { value: 'compare', label: 'Compare', icon: GitBranch, pastel: 'bg-pastel-compare-b' },
+  { value: 'graph', label: 'Graph', icon: GitGraph, pastel: 'bg-pastel-graph' },
 ];
 
 const emptyCopy = {
@@ -94,6 +96,10 @@ export default function DashboardPage() {
 
       {tab === 'compare' && (
         <BranchCompare projectId={config.projectId} token={config.token} branches={branches} />
+      )}
+
+      {tab === 'graph' && (
+        <GraphExplorer projectId={config.projectId} token={config.token} />
       )}
     </div>
   );

@@ -420,5 +420,203 @@ server.tool(
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 
+// ── Phase 3: Graph Tools ───────────────────────────────────────────────────────
+
+// Tool 6: query_knowledge_graph
+server.tool(
+  "query_knowledge_graph",
+  "Query the engineering knowledge graph for related entities and relationships. " +
+    "Traverses the graph from a starting entity or finds entities by type within a project. " +
+    "Returns entities, relationships, and traversal paths with provenance information. " +
+    "WHY: Understanding how engineering artifacts relate (commits, PRs, files, decisions) " +
+    "is essential for impact analysis, debugging, and architectural reasoning.",
+  {
+    projectId: z.string().optional().describe("Project ID"),
+    entityType: z
+      .enum(["repository", "commit", "pull_request", "file", "engineering_decision"])
+      .optional()
+      .describe("Entity type to query (required if entityId not provided)"),
+    entityId: z.string().optional().describe("Specific entity ID to start traversal from"),
+    relationshipTypes: z
+      .array(z.enum(["contains", "authored_in", "modifies", "has_parent", "includes_commit", "targets_file", "has_decision", "relates_to", "derived_from", "associated_with"]))
+      .optional()
+      .describe("Filter by relationship types"),
+    direction: z
+      .enum(["outgoing", "incoming", "both"])
+      .default("both")
+      .describe("Traversal direction from the starting entity"),
+    maxDepth: z
+      .number()
+      .int()
+      .min(1)
+      .max(3)
+      .default(2)
+      .describe("Maximum graph traversal depth (1-3)"),
+    maxResults: z
+      .number()
+      .int()
+      .min(1)
+      .max(50)
+      .default(20)
+      .describe("Maximum entities to return (1-50)"),
+    branch: z.string().optional().describe("Branch context filter"),
+  },
+  async ({ projectId, entityType, entityId, relationshipTypes, direction, maxDepth, maxResults, branch }) => {
+    const pid = projectId ?? DEFAULT_PROJECT_ID;
+    if (!pid) {
+      return { isError: true, content: [{ type: "text" as const, text: "projectId is required." }] };
+    }
+    if (!entityId && !entityType) {
+      return { isError: true, content: [{ type: "text" as const, text: "Either entityId or entityType must be provided." }] };
+    }
+    try {
+      const data = await callMcp("query_knowledge_graph", {
+        projectId: pid,
+        entityType,
+        entityId,
+        relationshipTypes,
+        direction,
+        maxDepth,
+        maxResults,
+        branch,
+      });
+      return { content: [{ type: "text" as const, text: toText(data) }] };
+    } catch (err) {
+      return { isError: true, content: [{ type: "text" as const, text: `query_knowledge_graph failed: ${(err as Error).message}` }] };
+    }
+  }
+);
+
+// Tool 7: get_related_changes
+server.tool(
+  "get_related_changes",
+  "Get changes related to a file, commit, pull request, or engineering decision. " +
+    "Returns related commits, pull requests, files, and decisions with relationship details. " +
+    "WHY: Understanding what else is connected to a change helps assess impact and find relevant context.",
+  {
+    projectId: z.string().optional().describe("Project ID"),
+    entityType: z
+      .enum(["commit", "pull_request", "file", "engineering_decision"])
+      .describe("Type of the entity to find relationships for"),
+    entityId: z.string().describe("ID of the entity to find relationships for"),
+    includeGraph: z.boolean().default(true).describe("Include graph relationships in response"),
+  },
+  async ({ projectId, entityType, entityId, includeGraph }) => {
+    const pid = projectId ?? DEFAULT_PROJECT_ID;
+    if (!pid) {
+      return { isError: true, content: [{ type: "text" as const, text: "projectId is required." }] };
+    }
+    try {
+      const data = await callMcp("get_related_changes", {
+        projectId: pid,
+        entityType,
+        entityId,
+        includeGraph,
+      });
+      return { content: [{ type: "text" as const, text: toText(data) }] };
+    } catch (err) {
+      return { isError: true, content: [{ type: "text" as const, text: `get_related_changes failed: ${(err as Error).message}` }] };
+    }
+  }
+);
+
+// Tool 8: get_engineering_decisions
+server.tool(
+  "get_engineering_decisions",
+  "Get explicit engineering decisions and related rationale for a project, repository, or entity. " +
+    "Clearly distinguishes explicit decisions from ordinary context notes. " +
+    "WHY: Decisions capture the 'why' behind implementation choices — critical for maintaining architectural consistency.",
+  {
+    projectId: z.string().optional().describe("Project ID"),
+    repositoryId: z.string().optional().describe("Repository ID filter"),
+    entityId: z.string().optional().describe("Filter decisions related to this entity"),
+    status: z.string().optional().describe("Filter by status (e.g., 'accepted', 'proposed', 'superseded')"),
+    limit: z.number().int().min(1).max(50).default(20).describe("Max results (1-50)"),
+  },
+  async ({ projectId, repositoryId, entityId, status, limit }) => {
+    const pid = projectId ?? DEFAULT_PROJECT_ID;
+    if (!pid) {
+      return { isError: true, content: [{ type: "text" as const, text: "projectId is required." }] };
+    }
+    try {
+      const data = await callMcp("get_engineering_decisions", {
+        projectId: pid,
+        repositoryId,
+        entityId,
+        status,
+        limit,
+      });
+      return { content: [{ type: "text" as const, text: toText(data) }] };
+    } catch (err) {
+      return { isError: true, content: [{ type: "text" as const, text: `get_engineering_decisions failed: ${(err as Error).message}` }] };
+    }
+  }
+);
+
+// Tool 9: get_repository_graph_summary
+server.tool(
+  "get_repository_graph_summary",
+  "Get a summary of a repository's knowledge graph including entity/relationship counts and recent activity. " +
+    "WHY: Quick overview of graph coverage helps understand what context is available and identify gaps.",
+  {
+    projectId: z.string().optional().describe("Project ID"),
+    repositoryId: z.string().optional().describe("Repository ID (optional, summarizes all if omitted)"),
+  },
+  async ({ projectId, repositoryId }) => {
+    const pid = projectId ?? DEFAULT_PROJECT_ID;
+    if (!pid) {
+      return { isError: true, content: [{ type: "text" as const, text: "projectId is required." }] };
+    }
+    try {
+      const data = await callMcp("get_repository_graph_summary", {
+        projectId: pid,
+        repositoryId,
+      });
+      return { content: [{ type: "text" as const, text: toText(data) }] };
+    } catch (err) {
+      return { isError: true, content: [{ type: "text" as const, text: `get_repository_graph_summary failed: ${(err as Error).message}` }] };
+    }
+  }
+);
+
+// Tool 10: find_related_context
+server.tool(
+  "find_related_context",
+  "Find context connected to an entity via the knowledge graph, optionally combined with semantic search. " +
+    "Returns graph-connected context and (if query provided) a grounded answer with sources. " +
+    "WHY: Combines relationship-aware traversal with semantic search for comprehensive answers.",
+  {
+    projectId: z.string().optional().describe("Project ID"),
+    entityType: z
+      .enum(["commit", "pull_request", "file", "engineering_decision"])
+      .describe("Type of the entity to find context for"),
+    entityId: z.string().describe("ID of the entity to find context for"),
+    query: z.string().optional().describe("Natural language question to combine with graph context"),
+    branch: z.string().optional().describe("Branch filter for semantic search"),
+    maxDepth: z.number().int().min(1).max(3).default(2).describe("Graph traversal depth (1-3)"),
+    maxResults: z.number().int().min(1).max(50).default(20).describe("Max context items (1-50)"),
+  },
+  async ({ projectId, entityType, entityId, query, branch, maxDepth, maxResults }) => {
+    const pid = projectId ?? DEFAULT_PROJECT_ID;
+    if (!pid) {
+      return { isError: true, content: [{ type: "text" as const, text: "projectId is required." }] };
+    }
+    try {
+      const data = await callMcp("find_related_context", {
+        projectId: pid,
+        entityType,
+        entityId,
+        query,
+        branch,
+        maxDepth,
+        maxResults,
+      });
+      return { content: [{ type: "text" as const, text: toText(data) }] };
+    } catch (err) {
+      return { isError: true, content: [{ type: "text" as const, text: `find_related_context failed: ${(err as Error).message}` }] };
+    }
+  }
+);
+
 const transport = new StdioServerTransport();
 await server.connect(transport);

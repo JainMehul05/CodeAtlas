@@ -6,6 +6,9 @@
 // Event types and validation
 export * from "./events";
 
+// Graph types and validation (Phase 3)
+export * from "./graph";
+
 // Error handling
 export * from "./errors";
 
