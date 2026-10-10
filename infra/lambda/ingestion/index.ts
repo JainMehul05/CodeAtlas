@@ -22,6 +22,12 @@ import {
   createEvent,
   PushEventPayload,
   Actor,
+  WorkflowRunPayload,
+  CheckRunPayload,
+  CheckSuitePayload,
+  isWorkflowRunPayload,
+  isCheckRunPayload,
+  isCheckSuitePayload,
 } from '@flowsync/shared';
 import { authenticate, verifyToken, hashToken } from './src/auth';
 
@@ -38,6 +44,8 @@ interface GitHubCommit {
 }
 
 interface GitHubRepository {
+  id: number;
+  name: string;
   full_name: string;
 }
 
@@ -64,6 +72,89 @@ interface GitHubPushPayload {
 interface GitHubPullRequestPayload {
   action: string;
   pull_request: GitHubPullRequest;
+  repository: GitHubRepository;
+}
+
+// ── GitHub Actions Webhook Payload Types ──────────────────────────────────────
+interface GitHubWorkflowRun {
+  id: number;
+  name: string;
+  run_id: number;
+  run_number: number;
+  run_attempt: number;
+  event: string;
+  status: string;
+  conclusion?: string;
+  head_branch: string;
+  head_sha: string;
+  repository: GitHubRepository;
+  started_at: string;
+  completed_at?: string;
+  html_url: string;
+  check_suite_id?: number;
+  pull_requests?: Array<{
+    number: number;
+    head_branch: string;
+    base_branch: string;
+  }>;
+}
+
+interface GitHubWorkflowRunPayload {
+  action: string;  // "requested", "in_progress", "completed"
+  workflow_run: GitHubWorkflowRun;
+  repository: GitHubRepository;
+}
+
+interface GitHubCheckRun {
+  id: number;
+  name: string;
+  head_sha: string;
+  status: string;
+  conclusion?: string;
+  started_at: string;
+  completed_at?: string;
+  html_url: string;
+  repository: GitHubRepository;
+  check_suite_id: number;
+  pull_requests?: Array<{
+    number: number;
+    head_branch: string;
+    base_branch: string;
+  }>;
+  output?: {
+    title: string;
+    summary: string;
+    text?: string;
+    annotations_count?: number;
+    annotations_url?: string;
+  };
+}
+
+interface GitHubCheckRunPayload {
+  action: string;  // "created", "in_progress", "completed", "rerequested", "requested_action"
+  check_run: GitHubCheckRun;
+  repository: GitHubRepository;
+}
+
+interface GitHubCheckSuite {
+  id: number;
+  head_branch: string;
+  head_sha: string;
+  status: string;
+  conclusion?: string;
+  repository: GitHubRepository;
+  pull_requests?: Array<{
+    number: number;
+    head_branch: string;
+    base_branch: string;
+  }>;
+  created_at: string;
+  updated_at: string;
+}
+
+interface GitHubCheckSuitePayload {
+  action: string;  // "completed", "requested", "rerequested"
+  check_suite: GitHubCheckSuite;
   repository: GitHubRepository;
 }
 
@@ -405,8 +496,9 @@ export async function handleGitHubWebhook(
   const githubDelivery = headers['x-github-delivery'];
   const githubSignature = headers['x-hub-signature-256'];
 
-  // Only support push and pull_request events for now
-  if (!githubEvent || !['push', 'pull_request'].includes(githubEvent)) {
+  // Support push, pull_request, workflow_run, check_run, and check_suite events
+  const supportedEvents = ['push', 'pull_request', 'workflow_run', 'check_run', 'check_suite'];
+  if (!githubEvent || !supportedEvents.includes(githubEvent)) {
     return respond(400, { error: 'unsupported_event', message: `Unsupported GitHub event type: ${githubEvent}` }, correlationId);
   }
 
@@ -432,8 +524,7 @@ export async function handleGitHubWebhook(
     return respond(400, { error: 'invalid_json', message: 'Body must be valid JSON' }, correlationId);
   }
 
-  // Extract project ID from repository - this would need to be mapped to a CodeAtlas project
-  // For now, we'll use a project ID from the payload or a default
+  // Extract project ID from repository
   const repository = (payload as Record<string, unknown>).repository as { full_name?: string } | undefined;
   const repoFullName = repository?.full_name;
   if (!repoFullName) {
@@ -442,7 +533,6 @@ export async function handleGitHubWebhook(
 
   // TODO: Map GitHub repository to CodeAtlas project ID
   // For now, we'll use a project ID from environment or derive from repo name
-  // This should be replaced with a proper project lookup
   const projectId = process.env.DEFAULT_PROJECT_ID || `github-${repoFullName.replace('/', '-')}`;
 
   // Extract event data based on event type
@@ -451,6 +541,7 @@ export async function handleGitHubWebhook(
   let eventData: FlowSyncEvent;
 
   if (githubEvent === 'push') {
+    // ... existing push handler
     const pushPayload = payload as Record<string, unknown>;
     const commits = (payload.commits as Array<Record<string, unknown>>) || [];
     const headCommit = (commits[commits.length - 1] || {}) as Record<string, unknown>;
@@ -483,6 +574,7 @@ export async function handleGitHubWebhook(
       },
     };
   } else if (githubEvent === 'pull_request') {
+    // ... existing pull_request handler
     const prPayload = payload as Record<string, unknown>;
     const action = prPayload.action as string;
     const pullRequest = prPayload.pull_request as Record<string, unknown> | undefined;
@@ -529,6 +621,141 @@ export async function handleGitHubWebhook(
         },
       },
     }
+  } else if (githubEvent === 'workflow_run') {
+    // Handle workflow_run events (GitHub Actions)
+    const wrPayload = payload as unknown as GitHubWorkflowRunPayload;
+    const action = wrPayload.action;
+    const workflowRun = wrPayload.workflow_run;
+
+    // Only process completed workflow runs for now
+    if (action !== 'completed' || !workflowRun.conclusion) {
+      return respond(200, { message: `Workflow run action '${action}' acknowledged but not processed` }, correlationId);
+    }
+
+    const repoId = workflowRun.repository.full_name.replace('/', '-');
+    const repositoryId = `repo:github:${repoId}`;
+    
+    // Extract PR numbers if available
+    const prNumbers = workflowRun.pull_requests?.map(pr => pr.number) || [];
+
+    eventData = {
+      eventId,
+      eventType: EventType.WORKFLOW_RUN,
+      source: EventSource.CI_CD,
+      projectId,
+      schemaVersion: '1',
+      timestamp,
+      correlationId,
+      deliveryId: githubDelivery,
+      actor: { id: 'github-actions', name: 'GitHub Actions' },
+      payload: {
+        workflowId: workflowRun.id,
+        workflowName: workflowRun.name,
+        runId: workflowRun.run_id,
+        runNumber: workflowRun.run_number,
+        runAttempt: workflowRun.run_attempt,
+        event: workflowRun.event,
+        status: workflowRun.status,
+        conclusion: workflowRun.conclusion,
+        headBranch: workflowRun.head_branch,
+        headSha: workflowRun.head_sha,
+        repository: {
+          id: workflowRun.repository.id,
+          name: workflowRun.repository.name,
+          fullName: workflowRun.repository.full_name,
+        },
+        startedAt: workflowRun.started_at,
+        completedAt: workflowRun.completed_at,
+        htmlUrl: workflowRun.html_url,
+        checkSuiteId: workflowRun.check_suite_id,
+        pullRequests: workflowRun.pull_requests,
+      } as WorkflowRunPayload,
+    };
+  } else if (githubEvent === 'check_run') {
+    // Handle check_run events
+    const crPayload = payload as unknown as GitHubCheckRunPayload;
+    const action = crPayload.action;
+    const checkRun = crPayload.check_run;
+
+    // Only process completed check runs
+    if (action !== 'completed' || !checkRun.conclusion) {
+      return respond(200, { message: `Check run action '${action}' acknowledged but not processed` }, correlationId);
+    }
+
+    const repoId = checkRun.repository.full_name.replace('/', '-');
+    const repositoryId = `repo:github:${repoId}`;
+    
+    // Extract PR numbers if available
+    const prNumbers = checkRun.pull_requests?.map(pr => pr.number) || [];
+
+    eventData = {
+      eventId,
+      eventType: EventType.CHECK_RUN,
+      source: EventSource.CI_CD,
+      projectId,
+      schemaVersion: '1',
+      timestamp,
+      correlationId,
+      deliveryId: githubDelivery,
+      actor: { id: 'github-actions', name: 'GitHub Actions' },
+      payload: {
+        checkRunId: checkRun.id,
+        name: checkRun.name,
+        headSha: checkRun.head_sha,
+        status: checkRun.status,
+        conclusion: checkRun.conclusion,
+        startedAt: checkRun.started_at,
+        completedAt: checkRun.completed_at,
+        htmlUrl: checkRun.html_url,
+        repository: {
+          id: checkRun.repository.id,
+          name: checkRun.repository.name,
+          fullName: checkRun.repository.full_name,
+        },
+        checkSuiteId: checkRun.check_suite_id,
+        pullRequests: checkRun.pull_requests,
+        output: checkRun.output,
+      } as CheckRunPayload,
+    };
+  } else if (githubEvent === 'check_suite') {
+    // Handle check_suite events
+    const csPayload = payload as unknown as GitHubCheckSuitePayload;
+    const action = csPayload.action;
+    const checkSuite = csPayload.check_suite;
+
+    if (action !== 'completed' || !checkSuite.conclusion) {
+      return respond(200, { message: `Check suite action '${action}' acknowledged but not processed` }, correlationId);
+    }
+
+    const repoId = checkSuite.repository.full_name.replace('/', '-');
+    const repositoryId = `repo:github:${repoId}`;
+
+    eventData = {
+      eventId,
+      eventType: EventType.CHECK_SUITE,
+      source: EventSource.CI_CD,
+      projectId,
+      schemaVersion: '1',
+      timestamp,
+      correlationId,
+      deliveryId: githubDelivery,
+      actor: { id: 'github-actions', name: 'GitHub Actions' },
+      payload: {
+        checkSuiteId: checkSuite.id,
+        headBranch: checkSuite.head_branch,
+        headSha: checkSuite.head_sha,
+        status: checkSuite.status,
+        conclusion: checkSuite.conclusion,
+        repository: {
+          id: checkSuite.repository.id,
+          name: checkSuite.repository.name,
+          fullName: checkSuite.repository.full_name,
+        },
+        pullRequests: checkSuite.pull_requests,
+        createdAt: checkSuite.created_at,
+        updatedAt: checkSuite.updated_at,
+      } as CheckSuitePayload,
+    };
   } else {
     return respond(400, { error: 'unsupported_event', message: `Unsupported GitHub event type: ${githubEvent}` }, correlationId);
   }
@@ -555,7 +782,8 @@ export async function handleGitHubWebhook(
       eventId: eventData.eventId,
       projectId: eventData.projectId,
       eventType: eventData.eventType,
-      branch: (eventData.payload as Record<string, unknown>).branch as string | undefined,
+      branch: (eventData.payload as Record<string, unknown>).branch as string | undefined ?? 
+              (eventData.payload as Record<string, unknown>).headBranch as string | undefined,
       parentBranch: (eventData.payload as Record<string, unknown>).parentBranch ?? null,
       payload: eventData.payload,
       timestamp: eventData.timestamp,
@@ -594,7 +822,8 @@ export async function handleGitHubWebhook(
   return respond(200, {
     eventId: eventData.eventId,
     projectId: eventData.projectId,
-    branch: (eventData.payload as Record<string, unknown>).branch as string | undefined,
+    branch: (eventData.payload as Record<string, unknown>).branch as string | undefined ?? 
+            (eventData.payload as Record<string, unknown>).headBranch as string | undefined,
     status: 'queued',
     receivedAt: timestamp,
     correlationId: eventData.correlationId,

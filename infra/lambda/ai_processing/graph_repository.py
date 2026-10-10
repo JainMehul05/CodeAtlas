@@ -639,6 +639,40 @@ def create_pull_request_entity(
     }
 
 
+def normalize_file_path(path: str) -> str:
+    """Normalize file path for consistent identity."""
+    # Remove leading/trailing whitespace
+    normalized = path.strip()
+    
+    # Handle URL-encoded paths
+    try:
+        from urllib.parse import unquote
+        normalized = unquote(normalized)
+    except Exception:
+        # Ignore decoding errors
+        pass
+    
+    # Normalize separators
+    normalized = normalized.replace('\\', '/')
+    
+    # Remove leading ./ or /
+    normalized = normalized.lstrip('./').lstrip('/')
+    
+    # Resolve . and .. segments
+    segments = normalized.split('/')
+    resolved: list[str] = []
+    for segment in segments:
+        if segment == '' or segment == '.':
+            continue
+        if segment == '..':
+            if resolved:
+                resolved.pop()
+        else:
+            resolved.append(segment)
+    
+    return '/'.join(resolved)
+
+
 def create_file_entity(
     repository_id: str,
     path: str,
@@ -646,7 +680,6 @@ def create_file_entity(
     language: Optional[str] = None
 ) -> dict:
     """Create a file entity with stable ID."""
-    from flowsync_shared.graph import normalize_file_path, generateFileId
     normalized_path = normalize_file_path(path)
     file_id = f"file:{repository_id}:{normalized_path}"
     now = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
@@ -714,11 +747,10 @@ def create_relationship(
     metadata: Optional[dict] = None
 ) -> dict:
     """Create a relationship with stable ID."""
-    from flowsync_shared.graph import generateRelationshipId
+    import hashlib
     
     relationship_id = f"rel:{relationship_type}:{source_entity_id}:{target_entity_id}"
     # Use a deterministic hash-based ID
-    import hashlib
     hash_input = f"{relationship_type}:{source_entity_id}:{target_entity_id}"
     relationship_id = f"rel:{hashlib.sha256(hash_input.encode()).hexdigest()[:16]}"
     

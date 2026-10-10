@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import type { ReactNode } from 'react';
 import { useAppContext } from '@/hooks/useAppContext';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,6 +20,7 @@ import {
   Lightbulb, 
   Search, 
   ChevronRight,
+  ChevronDown,
   Loader2,
   AlertCircle,
   Info,
@@ -40,7 +42,8 @@ interface GraphEntity {
   createdAt?: string;
   updatedAt?: string;
   commitHash?: string;
-  [key: string]: unknown;
+  risk?: string;
+  [key: string]: ReactNode | undefined;
 }
 
 interface GraphRelationship {
@@ -121,6 +124,7 @@ function GraphExplorerContent({
   token,
 }: Props) {
   const [activeTab, setActiveTab] = useState<'explore' | 'summary' | 'search'>('explore');
+  const [innerTab, setInnerTab] = useState<'entities' | 'relationships' | 'paths'>('entities');
   const [selectedEntityType, setSelectedEntityType] = useState<string>('commit');
   const [entityId, setEntityId] = useState<string>('');
   const [relationshipTypes, setRelationshipTypes] = useState<string[]>([]);
@@ -133,7 +137,14 @@ function GraphExplorerContent({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedEntity, setSelectedEntity] = useState<GraphEntity | null>(null);
-  const [entityDetails, setEntityDetails] = useState<{ entities: GraphEntity[]; relationships: GraphRelationship[] } | null>(null);
+  const [entityDetails, setEntityDetails] = useState<{ 
+    entities: GraphEntity[]; 
+    relationships: GraphRelationship[]; 
+    relatedCommits?: GraphEntity[];
+    relatedPRs?: GraphEntity[];
+    relatedFiles?: GraphEntity[];
+    relatedDecisions?: GraphEntity[];
+  } | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://86tzell2w9.execute-api.us-east-1.amazonaws.com/prod';
@@ -258,9 +269,9 @@ function GraphExplorerContent({
   };
 
   const getEntityTypeBadge = (type: string) => {
-    const variants: Record<string, 'default' | 'secondary' | 'outline' | 'destructive'> = {
+    const variants: Record<string, 'default' | 'neutral' | 'success' | 'warn' | 'destructive' | 'outline'> = {
       repository: 'default',
-      commit: 'secondary',
+      commit: 'neutral',
       pull_request: 'outline',
       file: 'default',
       engineering_decision: 'destructive',
@@ -276,7 +287,7 @@ function GraphExplorerContent({
   return (
     <div className="space-y-6">
       {/* Tab Navigation */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'explore' | 'summary' | 'search')} className="w-full">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="explore">Explore Graph</TabsTrigger>
           <TabsTrigger value="summary">Repository Summary</TabsTrigger>
@@ -288,7 +299,7 @@ function GraphExplorerContent({
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Query Knowledge Graph</CardTitle>
-              <Badge variant="secondary" className="text-xs">Phase 3</Badge>
+              <Badge variant="neutral" className="text-xs">Phase 3</Badge>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -413,12 +424,12 @@ function GraphExplorerContent({
                 <CardTitle className="flex items-center gap-2">
                   <GitGraph className="h-5 w-5" />
                   Graph Results
-                  <Badge variant="secondary">{graphData.count} entities</Badge>
+                  <Badge variant="neutral">{graphData.count} entities</Badge>
                   <Badge variant="outline">{graphData.relationships.length} relationships</Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <Tabs defaultValue="entities" className="w-full">
+                <Tabs value={innerTab} onValueChange={(v) => setInnerTab(v as 'entities' | 'relationships' | 'paths')} className="w-full">
                   <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="entities">Entities ({graphData.entities.length})</TabsTrigger>
                     <TabsTrigger value="relationships">Relationships ({graphData.relationships.length})</TabsTrigger>
@@ -475,7 +486,7 @@ function GraphExplorerContent({
                             <div className="flex-1 min-w-0">
                               <div className="font-mono text-sm">{rel.sourceEntityId.slice(0, 20)}...</div>
                               <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                <Badge variant="secondary" className="gap-1">
+                                <Badge variant="neutral" className="gap-1">
                                   <ChevronRight className="h-3 w-3" />
                                   {RELATIONSHIP_TYPE_LABELS[rel.relationshipType] || rel.relationshipType}
                                 </Badge>
@@ -485,12 +496,13 @@ function GraphExplorerContent({
                               <ChevronRight className="h-4 w-4" />
                               <div className="font-mono text-sm">{rel.targetEntityId.slice(0, 20)}...</div>
                             </div>
-                          ))}
-                          {graphData.relationships.length === 0 && (
-                            <EmptyState icon={<GitGraph className="h-7 w-7" />} title="No relationships found" description="No relationships match the current filters." />
-                          )}
-                        </div>
-                      </ScrollArea>
+                          </div>
+                        ))}
+                        {graphData.relationships.length === 0 && (
+                          <EmptyState icon={<GitGraph className="h-7 w-7" />} title="No relationships found" description="No relationships match the current filters." />
+                        )}
+                      </div>
+                    </ScrollArea>
                   </TabsContent>
 
                   <TabsContent value="paths">
@@ -498,7 +510,7 @@ function GraphExplorerContent({
                       <div className="space-y-2">
                         {graphData.paths.map((path, idx) => (
                           <div key={idx} className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
-                            <Badge variant="secondary">{path.depth} hops</Badge>
+                            <Badge variant="neutral">{path.depth} hops</Badge>
                             <div className="flex-1 min-w-0 flex items-center gap-2 text-sm">
                               {path.path.map((p, i) => (
                                 <span key={i} className="flex items-center gap-1">
@@ -574,7 +586,7 @@ function GraphExplorerContent({
                                   <div key={rel.relationshipId} className="text-sm text-muted-foreground flex items-center gap-2">
                                     <span className="font-mono">{rel.sourceEntityId?.slice(0, 12)}</span>
                                     <ChevronRight className="h-3 w-3" />
-                                    <Badge variant="secondary">{RELATIONSHIP_TYPE_LABELS[rel.relationshipType] || rel.relationshipType}</Badge>
+                                    <Badge variant="neutral">{RELATIONSHIP_TYPE_LABELS[rel.relationshipType] || rel.relationshipType}</Badge>
                                     <ChevronRight className="h-3 w-3" />
                                     <span className="font-mono">{rel.targetEntityId?.slice(0, 12)}</span>
                                   </div>
@@ -614,7 +626,7 @@ function GraphExplorerContent({
                         {Object.entries(summaryData.entityCounts).map(([type, count]) => (
                           <div key={type} className="flex items-center justify-between text-sm">
                             <span className="flex items-center gap-2">{getEntityTypeIcon(type)} {ENTITY_TYPE_LABELS[type] || type}</span>
-                            <Badge variant="secondary">{count}</Badge>
+                            <Badge variant="neutral">{count}</Badge>
                           </div>
                         ))}
                       </div>
@@ -625,7 +637,7 @@ function GraphExplorerContent({
                         {Object.entries(summaryData.relationshipCounts).filter(([, count]) => count > 0).map(([type, count]) => (
                           <div key={type} className="flex items-center justify-between text-sm">
                             <span>{RELATIONSHIP_TYPE_LABELS[type] || type}</span>
-                            <Badge variant="secondary">{count}</Badge>
+                            <Badge variant="neutral">{count}</Badge>
                           </div>
                         ))}
                       </div>
@@ -651,7 +663,7 @@ function GraphExplorerContent({
                         </div>
                       </ScrollArea>
                     </div>
-                  </div>
+                  )}
                 </CardContent>
               </Card>
             </>

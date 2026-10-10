@@ -524,7 +524,7 @@ def ingest_graph_from_event(body: dict, correlation_id: str):
     repo_name = "unknown"
     
     # Try to get repository from payload or context
-    if event_type in ('push', 'merge') and payload.get('repository'):
+    if event_type in ('push', 'merge', 'workflow_run', 'check_run', 'check_suite') and payload.get('repository'):
         repo_info = payload.get('repository', {})
         owner = repo_info.get('owner', 'unknown')
         repo_name = repo_info.get('name', 'unknown')
@@ -689,10 +689,86 @@ def ingest_graph_from_event(body: dict, correlation_id: str):
                 upsert_graph_entity(pr_entity)
                 entities_created.append(pr_id)
                 
-                # Relationship: PR INCLUDES_COMMIT (for merge commit)
+                # Also create commit entity for merge commit
                 commit_hash = payload.get('commitHash')
                 if commit_hash:
                     commit_id = generate_commit_id(repository_id, commit_hash)
+                    commit_entity = {
+                        'entityId': commit_id,
+                        'entityType': 'commit',
+                        'projectId': project_id,
+                        'repositoryId': repository_id,
+                        'sha': commit_hash.lower(),
+                        'author': payload.get('author', 'unknown'),
+                        'committer': payload.get('author', 'unknown'),
+                        'message': payload.get('message', ''),
+                        'committedAt': timestamp,
+                        'parentShas': [],  # Would need to fetch from GitHub API
+                        'source': 'github',
+                        'createdAt': timestamp,
+                        'updatedAt': timestamp,
+                        'schemaVersion': GRAPH_SCHEMA_VERSION,
+                    }
+                    upsert_graph_entity(commit_entity)
+                    entities_created.append(commit_id)
+                    
+                    # Relationship: commit MODIFIES files
+                    changed_files = payload.get('changedFiles', [])
+                    for file_path in changed_files:
+                        file_id = generate_file_id(repository_id, file_path)
+                        file_entity = {
+                            'entityId': file_id,
+                            'entityType': 'file',
+                            'projectId': project_id,
+                            'repositoryId': repository_id,
+                            'path': file_path,
+                            'lastObservedAt': timestamp,
+                            'createdAt': timestamp,
+                            'updatedAt': timestamp,
+                            'schemaVersion': GRAPH_SCHEMA_VERSION,
+                        }
+                        upsert_graph_entity(file_entity)
+                        entities_created.append(file_id)
+                        
+                        # MODIFIES relationship
+                        rel = {
+                            'relationshipId': generate_relationship_id('modifies', commit_id, file_id),
+                            'relationshipType': 'modifies',
+                            'sourceEntityId': commit_id,
+                            'sourceEntityType': 'commit',
+                            'targetEntityId': file_id,
+                            'targetEntityType': 'file',
+                            'projectId': project_id,
+                            'repositoryId': repository_id,
+                            'provenance': 'explicit',
+                            'evidence': event_id,
+                            'createdAt': timestamp,
+                            'updatedAt': timestamp,
+                            'schemaVersion': GRAPH_SCHEMA_VERSION,
+                        }
+                        upsert_graph_relationship(rel)
+                        relationships_created.append(rel['relationshipId'])
+                    
+                    # Relationship: commit AUTHORED_IN repository
+                    rel = {
+                        'relationshipId': generate_relationship_id('authored_in', commit_id, repository_id),
+                        'relationshipType': 'authored_in',
+                        'sourceEntityId': commit_id,
+                        'sourceEntityType': 'commit',
+                        'targetEntityId': repository_id,
+                        'targetEntityType': 'repository',
+                        'projectId': project_id,
+                        'repositoryId': repository_id,
+                        'provenance': 'explicit',
+                        'evidence': event_id,
+                        'createdAt': timestamp,
+                        'updatedAt': timestamp,
+                        'schemaVersion': GRAPH_SCHEMA_VERSION,
+                    }
+                    upsert_graph_relationship(rel)
+                    relationships_created.append(rel['relationshipId'])
+                    
+                    # Relationship: PR INCLUDES_COMMIT (for merge commit)
                     rel = {
                         'relationshipId': generate_relationship_id('includes_commit', pr_id, commit_id),
                         'relationshipType': 'includes_commit',
@@ -732,6 +808,310 @@ def ingest_graph_from_event(body: dict, correlation_id: str):
                     }
                     upsert_graph_relationship(rel)
                     relationships_created.append(rel['relationshipId'])
+                
+                # Create repository entity and CONTAINS relationships for files
+                repo_entity = {
+                    'entityId': repository_id,
+                    'entityType': 'repository',
+                    'projectId': project_id,
+                    'repositoryId': repository_id,
+                    'provider': provider,
+                    'owner': owner,
+                    'name': repo_name,
+                    'defaultBranch': payload.get('branch', 'main'),
+                    'createdAt': timestamp,
+                    'updatedAt': timestamp,
+                    'schemaVersion': GRAPH_SCHEMA_VERSION,
+                }
+                upsert_graph_entity(repo_entity)
+                entities_created.append(repository_id)
+                
+                for file_path in changed_files:
+                    file_id = generate_file_id(repository_id, file_path)
+                    rel = {
+                        'relationshipId': generate_relationship_id('contains', repository_id, file_id),
+                        'relationshipType': 'contains',
+                        'sourceEntityId': repository_id,
+                        'sourceEntityType': 'repository',
+                        'targetEntityId': file_id,
+                        'targetEntityType': 'file',
+                        'projectId': project_id,
+                        'repositoryId': repository_id,
+                        'provenance': 'explicit',
+                        'evidence': event_id,
+                        'createdAt': timestamp,
+                        'updatedAt': timestamp,
+                        'schemaVersion': GRAPH_SCHEMA_VERSION,
+                    }
+                    upsert_graph_relationship(rel)
+                    relationships_created.append(rel['relationshipId'])
+        
+        # Ingest engineering decision from context extraction
+        # The context extraction creates a context record with feature, decision, etc.
+        # We can create an engineering_decision entity from this
+        if event_type == 'push' and payload.get('commitHash'):
+            # This will be linked after context extraction
+            pass
+        
+        elif event_type == 'workflow_run':
+            # Handle GitHub Actions workflow run
+            workflow_run_id = payload.get('runId')
+            if workflow_run_id:
+                repo_info = payload.get('repository', {})
+                if repo_info:
+                    owner = repo_info.get('owner', 'unknown')
+                    repo_name = repo_info.get('name', 'unknown')
+                    repository_id = generate_repository_id(provider, owner, repo_name)
+                
+                workflow_run_entity_id = f"workflow:{repository_id}:{workflow_run_id}"
+                workflow_run_entity = {
+                    'entityId': workflow_run_entity_id,
+                    'entityType': 'workflow_run',
+                    'projectId': project_id,
+                    'repositoryId': repository_id,
+                    'workflowId': payload.get('workflowId'),
+                    'workflowName': payload.get('workflowName'),
+                    'runId': workflow_run_id,
+                    'runNumber': payload.get('runNumber'),
+                    'runAttempt': payload.get('runAttempt'),
+                    'event': payload.get('event'),
+                    'status': payload.get('status'),
+                    'conclusion': payload.get('conclusion'),
+                    'headBranch': payload.get('headBranch'),
+                    'headSha': payload.get('headSha'),
+                    'startedAt': payload.get('startedAt'),
+                    'completedAt': payload.get('completedAt'),
+                    'htmlUrl': payload.get('htmlUrl'),
+                    'checkSuiteId': payload.get('checkSuiteId'),
+                    'pullRequestNumbers': payload.get('pullRequests', []),
+                    'createdAt': timestamp,
+                    'updatedAt': timestamp,
+                    'schemaVersion': GRAPH_SCHEMA_VERSION,
+                }
+                upsert_graph_entity(workflow_run_entity)
+                entities_created.append(workflow_run_entity_id)
+                
+                # Relationship: workflow run TRIGGERS from commit
+                head_sha = payload.get('headSha')
+                if head_sha:
+                    commit_id = generate_commit_id(repository_id, head_sha)
+                    rel = {
+                        'relationshipId': generate_relationship_id('triggers', commit_id, workflow_run_entity_id),
+                        'relationshipType': 'triggers',
+                        'sourceEntityId': commit_id,
+                        'sourceEntityType': 'commit',
+                        'targetEntityId': workflow_run_entity_id,
+                        'targetEntityType': 'workflow_run',
+                        'projectId': project_id,
+                        'repositoryId': repository_id,
+                        'provenance': 'explicit',
+                        'evidence': event_id,
+                        'createdAt': timestamp,
+                        'updatedAt': timestamp,
+                        'schemaVersion': GRAPH_SCHEMA_VERSION,
+                    }
+                    upsert_graph_relationship(rel)
+                    relationships_created.append(rel['relationshipId'])
+                
+                # Relationship: workflow run HAS_CHECK for check runs
+                # This will be populated when check_run events are processed
+                
+                # Create repository entity if not exists
+                repo_entity = {
+                    'entityId': repository_id,
+                    'entityType': 'repository',
+                    'projectId': project_id,
+                    'repositoryId': repository_id,
+                    'provider': provider,
+                    'owner': owner,
+                    'name': repo_name,
+                    'defaultBranch': payload.get('headBranch', 'main'),
+                    'createdAt': timestamp,
+                    'updatedAt': timestamp,
+                    'schemaVersion': GRAPH_SCHEMA_VERSION,
+                }
+                upsert_graph_entity(repo_entity)
+                entities_created.append(repository_id)
+        
+        elif event_type == 'check_run':
+            # Handle GitHub Actions check run
+            check_run_id = payload.get('checkRunId')
+            if check_run_id:
+                repo_info = payload.get('repository', {})
+                if repo_info:
+                    owner = repo_info.get('owner', 'unknown')
+                    repo_name = repo_info.get('name', 'unknown')
+                    repository_id = generate_repository_id(provider, owner, repo_name)
+                
+                check_run_entity_id = f"check:{repository_id}:{check_run_id}"
+                check_run_entity = {
+                    'entityId': check_run_entity_id,
+                    'entityType': 'check_run',
+                    'projectId': project_id,
+                    'repositoryId': repository_id,
+                    'checkRunId': check_run_id,
+                    'name': payload.get('name'),
+                    'headSha': payload.get('headSha'),
+                    'status': payload.get('status'),
+                    'conclusion': payload.get('conclusion'),
+                    'startedAt': payload.get('startedAt'),
+                    'completedAt': payload.get('completedAt'),
+                    'htmlUrl': payload.get('htmlUrl'),
+                    'checkSuiteId': payload.get('checkSuiteId'),
+                    'pullRequestNumbers': payload.get('pullRequests', []),
+                    'outputTitle': payload.get('outputTitle'),
+                    'outputSummary': payload.get('outputSummary'),
+                    'outputText': payload.get('outputText'),
+                    'annotationsCount': payload.get('annotationsCount'),
+                    'annotationsUrl': payload.get('annotationsUrl'),
+                    'createdAt': timestamp,
+                    'updatedAt': timestamp,
+                    'schemaVersion': GRAPH_SCHEMA_VERSION,
+                }
+                # Remove None values
+                check_run_entity = {k: v for k, v in check_run_entity.items() if v is not None}
+                upsert_graph_entity(check_run_entity)
+                entities_created.append(check_run_entity_id)
+                
+                # Relationship: check run HAS_CHECK from workflow run
+                check_suite_id = payload.get('checkSuiteId')
+                if check_suite_id:
+                    workflow_run_entity_id = f"workflow:{repository_id}:{check_suite_id}"
+                    rel = {
+                        'relationshipId': generate_relationship_id('has_check', workflow_run_entity_id, check_run_entity_id),
+                        'relationshipType': 'has_check',
+                        'sourceEntityId': workflow_run_entity_id,
+                        'sourceEntityType': 'workflow_run',
+                        'targetEntityId': check_run_entity_id,
+                        'targetEntityType': 'check_run',
+                        'projectId': project_id,
+                        'repositoryId': repository_id,
+                        'provenance': 'explicit',
+                        'evidence': event_id,
+                        'createdAt': timestamp,
+                        'updatedAt': timestamp,
+                        'schemaVersion': GRAPH_SCHEMA_VERSION,
+                    }
+                    upsert_graph_relationship(rel)
+                    relationships_created.append(rel['relationshipId'])
+                
+                # Relationship: check run FAILED_IN file/commit if failed
+                if payload.get('conclusion') == 'failure':
+                    head_sha = payload.get('headSha')
+                    if head_sha:
+                        commit_id = generate_commit_id(repository_id, head_sha)
+                        rel = {
+                            'relationshipId': generate_relationship_id('failed_in', commit_id, check_run_entity_id),
+                            'relationshipType': 'failed_in',
+                            'sourceEntityId': commit_id,
+                            'sourceEntityType': 'commit',
+                            'targetEntityId': check_run_entity_id,
+                            'targetEntityType': 'check_run',
+                            'projectId': project_id,
+                            'repositoryId': repository_id,
+                            'provenance': 'inferred',
+                            'evidence': event_id,
+                            'createdAt': timestamp,
+                            'updatedAt': timestamp,
+                            'schemaVersion': GRAPH_SCHEMA_VERSION,
+                        }
+                        upsert_graph_relationship(rel)
+                        relationships_created.append(rel['relationshipId'])
+                
+                # Create repository entity if not exists
+                repo_entity = {
+                    'entityId': repository_id,
+                    'entityType': 'repository',
+                    'projectId': project_id,
+                    'repositoryId': repository_id,
+                    'provider': provider,
+                    'owner': owner,
+                    'name': repo_name,
+                    'defaultBranch': 'main',
+                    'createdAt': timestamp,
+                    'updatedAt': timestamp,
+                    'schemaVersion': GRAPH_SCHEMA_VERSION,
+                }
+                upsert_graph_entity(repo_entity)
+                entities_created.append(repository_id)
+        
+        elif event_type == 'check_suite':
+            # Handle GitHub Actions check suite
+            check_suite_id = payload.get('checkSuiteId')
+            if check_suite_id:
+                repo_info = payload.get('repository', {})
+                if repo_info:
+                    owner = repo_info.get('owner', 'unknown')
+                    repo_name = repo_info.get('name', 'unknown')
+                    repository_id = generate_repository_id(provider, owner, repo_name)
+                
+                # Check suite is essentially a workflow run, so we can create a workflow_run entity
+                workflow_run_entity_id = f"workflow:{repository_id}:{check_suite_id}"
+                workflow_run_entity = {
+                    'entityId': workflow_run_entity_id,
+                    'entityType': 'workflow_run',
+                    'projectId': project_id,
+                    'repositoryId': repository_id,
+                    'workflowId': 0,  # Not directly available in check_suite
+                    'workflowName': 'Check Suite',
+                    'runId': check_suite_id,
+                    'runNumber': 0,
+                    'runAttempt': 1,
+                    'event': 'check_suite',
+                    'status': payload.get('status'),
+                    'conclusion': payload.get('conclusion'),
+                    'headBranch': payload.get('headBranch'),
+                    'headSha': payload.get('headSha'),
+                    'startedAt': payload.get('createdAt'),
+                    'completedAt': payload.get('updatedAt'),
+                    'htmlUrl': '',  # Not directly available
+                    'checkSuiteId': check_suite_id,
+                    'pullRequestNumbers': [pr.get('number') for pr in payload.get('pullRequests', [])],
+                    'createdAt': timestamp,
+                    'updatedAt': timestamp,
+                    'schemaVersion': GRAPH_SCHEMA_VERSION,
+                }
+                upsert_graph_entity(workflow_run_entity)
+                entities_created.append(workflow_run_entity_id)
+                
+                # Relationship: workflow run TRIGGERS from commit
+                head_sha = payload.get('headSha')
+                if head_sha:
+                    commit_id = generate_commit_id(repository_id, head_sha)
+                    rel = {
+                        'relationshipId': generate_relationship_id('triggers', commit_id, workflow_run_entity_id),
+                        'relationshipType': 'triggers',
+                        'sourceEntityId': commit_id,
+                        'sourceEntityType': 'commit',
+                        'targetEntityId': workflow_run_entity_id,
+                        'targetEntityType': 'workflow_run',
+                        'projectId': project_id,
+                        'repositoryId': repository_id,
+                        'provenance': 'explicit',
+                        'evidence': event_id,
+                        'createdAt': timestamp,
+                        'updatedAt': timestamp,
+                        'schemaVersion': GRAPH_SCHEMA_VERSION,
+                    }
+                    upsert_graph_relationship(rel)
+                    relationships_created.append(rel['relationshipId'])
+                
+                # Create repository entity if not exists
+                repo_entity = {
+                    'entityId': repository_id,
+                    'entityType': 'repository',
+                    'projectId': project_id,
+                    'repositoryId': repository_id,
+                    'provider': provider,
+                    'owner': owner,
+                    'name': repo_name,
+                    'defaultBranch': payload.get('headBranch', 'main'),
+                    'createdAt': timestamp,
+                    'updatedAt': timestamp,
+                    'schemaVersion': GRAPH_SCHEMA_VERSION,
+                }
+                upsert_graph_entity(repo_entity)
+                entities_created.append(repository_id)
         
         # Ingest engineering decision from context extraction
         # The context extraction creates a context record with feature, decision, etc.
@@ -856,6 +1236,7 @@ def process_event(event_data: dict, correlation_id: str) -> dict:
     timestamp = event_data.get("timestamp", datetime.utcnow().isoformat() + "Z")
     parent_branch = event_data.get("parentBranch")
     payload = event_data.get("payload", event_data)
+    delivery_id = event_data.get("deliveryId")
     
     diff         = payload.get("diff", "")
     commit_hash  = payload.get("commitHash")

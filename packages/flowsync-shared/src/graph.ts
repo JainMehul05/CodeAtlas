@@ -16,6 +16,8 @@ export enum GraphEntityType {
   FILE = "file",
   ENGINEERING_DECISION = "engineering_decision",
   DEVELOPER = "developer",
+  WORKFLOW_RUN = "workflow_run",
+  CHECK_RUN = "check_run",
 }
 
 /**
@@ -32,6 +34,9 @@ export enum GraphRelationshipType {
   RELATES_TO = "relates_to",                // Engineering Decision/Context -> Commit, PR, File, Repository
   DERIVED_FROM = "derived_from",            // Graph entity/relationship -> originating event/context
   ASSOCIATED_WITH = "associated_with",      // Generic association between entities
+  TRIGGERS = "triggers",                    // Commit/PR -> Workflow Run
+  HAS_CHECK = "has_check",                  // Workflow Run -> Check Run
+  FAILED_IN = "failed_in",                  // File/Commit -> Failed Check/Workflow
 }
 
 /**
@@ -140,6 +145,53 @@ export interface DeveloperEntity extends GraphEntity {
 }
 
 /**
+ * Workflow Run entity (GitHub Actions workflow run)
+ */
+export interface WorkflowRunEntity extends GraphEntity {
+  entityType: GraphEntityType.WORKFLOW_RUN;
+  workflowId: number;
+  workflowName: string;
+  runId: number;
+  runNumber: number;
+  runAttempt: number;
+  event: string;  // e.g., "push", "pull_request"
+  status: string;  // "queued", "in_progress", "completed"
+  conclusion?: string;  // "success", "failure", "cancelled", "skipped", "timed_out", "action_required"
+  headBranch: string;
+  headSha: string;
+  repositoryId: string;
+  startedAt: string;
+  completedAt?: string;
+  htmlUrl: string;
+  checkSuiteId?: number;
+  pullRequestNumbers?: number[];
+}
+
+/**
+ * Check Run entity (GitHub Actions check run)
+ */
+export interface CheckRunEntity extends GraphEntity {
+  entityType: GraphEntityType.CHECK_RUN;
+  checkRunId: number;
+  name: string;
+  headSha: string;
+  status: string;  // "queued", "in_progress", "completed"
+  conclusion?: string;  // "success", "failure", "neutral", "cancelled", "skipped", "timed_out", "action_required"
+  startedAt: string;
+  completedAt?: string;
+  htmlUrl: string;
+  repositoryId: string;
+  checkSuiteId: number;
+  workflowRunId?: string;
+  pullRequestNumbers?: number[];
+  outputTitle?: string;
+  outputSummary?: string;
+  outputText?: string;
+  annotationsCount?: number;
+  annotationsUrl?: string;
+}
+
+/**
  * Union type for all entity types
  */
 export type AnyGraphEntity =
@@ -148,7 +200,9 @@ export type AnyGraphEntity =
   | PullRequestEntity
   | FileEntity
   | EngineeringDecisionEntity
-  | DeveloperEntity;
+  | DeveloperEntity
+  | WorkflowRunEntity
+  | CheckRunEntity;
 
 /**
  * Graph relationship interface
@@ -193,6 +247,14 @@ export function generateFileId(repositoryId: string, path: string): string {
 
 export function generateEngineeringDecisionId(projectId: string, sourceType: string, sourceId: string): string {
   return `decision:${projectId}:${sourceType}:${sourceId}`;
+}
+
+export function generateWorkflowRunId(repositoryId: string, runId: number): string {
+  return `workflow:${repositoryId}:${runId}`;
+}
+
+export function generateCheckRunId(repositoryId: string, checkRunId: number): string {
+  return `check:${repositoryId}:${checkRunId}`;
 }
 
 export function generateDeveloperId(email: string): string {
@@ -331,6 +393,47 @@ export const DeveloperEntitySchema = GraphEntityBaseSchema.extend({
   source: z.string().min(1),
 });
 
+export const WorkflowRunEntitySchema = GraphEntityBaseSchema.extend({
+  entityType: z.literal(GraphEntityType.WORKFLOW_RUN),
+  workflowId: z.number().int().positive(),
+  workflowName: z.string().min(1),
+  runId: z.number().int().positive(),
+  runNumber: z.number().int().positive(),
+  runAttempt: z.number().int().positive(),
+  event: z.string().min(1),
+  status: z.enum(["queued", "in_progress", "completed"]),
+  conclusion: z.enum(["success", "failure", "cancelled", "skipped", "timed_out", "action_required"]).optional(),
+  headBranch: z.string().min(1),
+  headSha: z.string().regex(/^[0-9a-f]{40}$/i),
+  repositoryId: z.string().min(1),
+  startedAt: z.string().datetime({ offset: true }),
+  completedAt: z.string().datetime({ offset: true }).optional(),
+  htmlUrl: z.string().url(),
+  checkSuiteId: z.number().int().positive().optional(),
+  pullRequestNumbers: z.array(z.number().int().positive()).optional(),
+});
+
+export const CheckRunEntitySchema = GraphEntityBaseSchema.extend({
+  entityType: z.literal(GraphEntityType.CHECK_RUN),
+  checkRunId: z.number().int().positive(),
+  name: z.string().min(1),
+  headSha: z.string().regex(/^[0-9a-f]{40}$/i),
+  status: z.enum(["queued", "in_progress", "completed"]),
+  conclusion: z.enum(["success", "failure", "neutral", "cancelled", "skipped", "timed_out", "action_required"]).optional(),
+  startedAt: z.string().datetime({ offset: true }),
+  completedAt: z.string().datetime({ offset: true }).optional(),
+  htmlUrl: z.string().url(),
+  repositoryId: z.string().min(1),
+  checkSuiteId: z.number().int().positive(),
+  workflowRunId: z.string().optional(),
+  pullRequestNumbers: z.array(z.number().int().positive()).optional(),
+  outputTitle: z.string().optional(),
+  outputSummary: z.string().optional(),
+  outputText: z.string().optional(),
+  annotationsCount: z.number().int().nonnegative().optional(),
+  annotationsUrl: z.string().url().optional(),
+});
+
 export const AnyGraphEntitySchema = z.discriminatedUnion("entityType", [
   RepositoryEntitySchema,
   CommitEntitySchema,
@@ -338,6 +441,8 @@ export const AnyGraphEntitySchema = z.discriminatedUnion("entityType", [
   FileEntitySchema,
   EngineeringDecisionEntitySchema,
   DeveloperEntitySchema,
+  WorkflowRunEntitySchema,
+  CheckRunEntitySchema,
 ]);
 
 export const GraphRelationshipSchema = z.object({
@@ -436,6 +541,19 @@ export function validateRelationshipCompatibility(
     ],
     [GraphRelationshipType.ASSOCIATED_WITH]: [
       // Generic association - allow any combination but warn
+    ],
+    [GraphRelationshipType.TRIGGERS]: [
+      [GraphEntityType.COMMIT, GraphEntityType.WORKFLOW_RUN],
+      [GraphEntityType.PULL_REQUEST, GraphEntityType.WORKFLOW_RUN],
+    ],
+    [GraphRelationshipType.HAS_CHECK]: [
+      [GraphEntityType.WORKFLOW_RUN, GraphEntityType.CHECK_RUN],
+    ],
+    [GraphRelationshipType.FAILED_IN]: [
+      [GraphEntityType.FILE, GraphEntityType.CHECK_RUN],
+      [GraphEntityType.FILE, GraphEntityType.WORKFLOW_RUN],
+      [GraphEntityType.COMMIT, GraphEntityType.CHECK_RUN],
+      [GraphEntityType.COMMIT, GraphEntityType.WORKFLOW_RUN],
     ],
   };
 
