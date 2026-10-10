@@ -110,6 +110,23 @@ export class InfraStack extends cdk.Stack {
     });
 
     // ─────────────────────────────────────────────
+    // PROJECT-REPOSITORY MAPPING TABLE (for secure GitHub repo to project mapping)
+    // ─────────────────────────────────────────────
+    const projectRepoMappingTable = new dynamodb.Table(this, 'FlowSyncProjectRepoMapping', {
+      tableName: 'flowsync-project-repo-mapping',
+      partitionKey: { name: 'repositoryId', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+    // GSI: Query mappings by project
+    projectRepoMappingTable.addGlobalSecondaryIndex({
+      indexName: 'ProjectMappingIndex',
+      partitionKey: { name: 'projectId', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'repositoryId', type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
+    // ─────────────────────────────────────────────
     // GRAPH TABLES (Phase 3 - Engineering Knowledge Graph)
     // ─────────────────────────────────────────────
     
@@ -178,7 +195,7 @@ export class InfraStack extends cdk.Stack {
       projectionType: dynamodb.ProjectionType.ALL,
     });
 
-    const allTables = [projectsTable, eventsTable, contextTable, auditTable, chatSessionsTable, cacheTable, idempotencyTable, graphEntitiesTable, graphRelationshipsTable];
+    const allTables = [projectsTable, eventsTable, contextTable, auditTable, chatSessionsTable, cacheTable, idempotencyTable, graphEntitiesTable, graphRelationshipsTable, projectRepoMappingTable];
 
     // ─────────────────────────────────────────────
     // S3 BUCKETS
@@ -266,6 +283,7 @@ export class InfraStack extends cdk.Stack {
         AUDIT_TABLE: auditTable.tableName,
         RAW_EVENTS_BUCKET: rawEventsBucket.bucketName,
         PROCESSING_QUEUE_URL: processingQueue.queueUrl,
+        PROJECT_REPO_MAPPING_TABLE: projectRepoMappingTable.tableName,
       },
     });
 

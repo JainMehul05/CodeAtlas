@@ -14,6 +14,7 @@ from decimal import Decimal
 from botocore.config import Config as BotoConfig
 from botocore.exceptions import ClientError
 from flowsync_common.helpers import respond, strip_embeddings, search_context_rag, search_context_rag_with_graph, convert_floats_to_decimal, call_titan_embedding
+from flowsync_common.auth import authenticate
 
 # Environment variables
 CONTEXT_TABLE = os.environ.get("CONTEXT_TABLE", "flowsync-context")
@@ -1052,6 +1053,13 @@ def handler(event, context):
         
         if not tool_name:
             return respond(400, {'error': 'bad_request', 'message': 'Missing tool name'})
+        
+        # Authenticate request (except for tools that don't require project access)
+        project_id = params.get('projectId')
+        if project_id:
+            auth_result = authenticate(event, project_id, dynamodb, PROJECTS_TABLE)
+            if not auth_result['success']:
+                return respond(auth_result['statusCode'], auth_result['error'])
         
         # Route to appropriate tool
         if tool_name == 'get_project_context':

@@ -47,7 +47,10 @@ async function callMcp(
 ): Promise<unknown> {
   const res = await fetch(`${API_URL}/mcp`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { 
+      "Content-Type": "application/json",
+      ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}),
+    },
     body: JSON.stringify({ tool, params }),
   });
   const data = (await res.json()) as unknown;

@@ -26,8 +26,21 @@ jest.mock('@aws-sdk/lib-dynamodb', () => {
     if (tableName === 'test-audit') {
       return Promise.resolve({});
     }
+    if (tableName === 'test-project-repo-mapping') {
+      const key = command?.input?.Key?.repositoryId;
+      if (key === 'github:org/repo') {
+        return Promise.resolve({ Item: { projectId: 'test-project' } });
+      }
+      return Promise.resolve({ Item: null });
+    }
     return Promise.resolve({});
   });
+
+  const MockGetCommand = jest.fn().mockImplementation((input) => ({ input }));
+  const MockPutCommand = jest.fn().mockImplementation((input) => ({ input }));
+  const MockUpdateCommand = jest.fn().mockImplementation((input) => ({ input }));
+  const MockQueryCommand = jest.fn().mockImplementation((input) => ({ input }));
+  const MockScanCommand = jest.fn().mockImplementation((input) => ({ input }));
 
   return {
     DynamoDBDocumentClient: {
@@ -35,11 +48,11 @@ jest.mock('@aws-sdk/lib-dynamodb', () => {
         send: mockSend,
       }),
     },
-    PutCommand: jest.fn(),
-    GetCommand: jest.fn(),
-    UpdateCommand: jest.fn(),
-    QueryCommand: jest.fn(),
-    ScanCommand: jest.fn(),
+    PutCommand: MockPutCommand,
+    GetCommand: MockGetCommand,
+    UpdateCommand: MockUpdateCommand,
+    QueryCommand: MockQueryCommand,
+    ScanCommand: MockScanCommand,
   };
 });
 
@@ -112,6 +125,7 @@ describe('Ingestion Lambda - Phase 2', () => {
       RAW_EVENTS_BUCKET: 'test-bucket',
       PROCESSING_QUEUE_URL: 'https://sqs.us-east-1.amazonaws.com/123456789/test-queue',
       GITHUB_WEBHOOK_SECRET: 'test-secret',
+      PROJECT_REPO_MAPPING_TABLE: 'test-project-repo-mapping',
     };
 
     // Reset mock implementations
@@ -311,6 +325,30 @@ describe('Ingestion Lambda - Phase 2', () => {
       expect(JSON.parse(result.body).error).toBe('configuration_error');
 
       process.env.GITHUB_WEBHOOK_SECRET = 'test-secret';
+    });
+
+    it('should reject when repository is not mapped to a project', async () => {
+      const payload = JSON.stringify({
+        ref: 'refs/heads/main',
+        repository: { full_name: 'unknown/repo' },
+        commits: [{ id: 'abc123', message: 'test', author: { name: 'user' } }],
+        pusher: { name: 'user' },
+      });
+      
+      const hmac = crypto.createHmac('sha256', 'test-secret');
+      hmac.update(payload);
+      const signature = 'sha256=' + hmac.digest('hex');
+
+      const headers = {
+        'x-github-event': 'push',
+        'x-github-delivery': 'delivery-unknown',
+        'x-hub-signature-256': signature,
+      };
+
+      const result = await handleGitHubWebhook(headers, payload, 'corr-123');
+
+      expect(result.statusCode).toBe(403);
+      expect(JSON.parse(result.body).error).toBe('project_not_found');
     });
   });
 

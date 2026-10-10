@@ -1,0 +1,2916 @@
+[WARNING] aws-cdk-lib.aws_cloudfront_origins.S3Origin is deprecated.
+  Use `S3BucketOrigin` or `S3StaticWebsiteOrigin` instead.
+  This API will be removed in the next major release.
+[WARNING] aws-cdk-lib.aws_cloudfront_origins.S3Origin#bind is deprecated.
+  Use `S3BucketOrigin` or `S3StaticWebsiteOrigin` instead.
+  This API will be removed in the next major release.
+Resources:
+  FlowSyncProjectsCDF862F6:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: projectId
+          AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+        - AttributeName: projectId
+          KeyType: HASH
+      TableName: flowsync-projects
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncProjects/Resource
+  FlowSyncEventsFFDBD9A2:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: projectId
+          AttributeType: S
+        - AttributeName: timestampEventId
+          AttributeType: S
+        - AttributeName: eventId
+          AttributeType: S
+        - AttributeName: branchTimestamp
+          AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+      GlobalSecondaryIndexes:
+        - IndexName: EventIdIndex
+          KeySchema:
+            - AttributeName: eventId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: BranchIndex
+          KeySchema:
+            - AttributeName: projectId
+              KeyType: HASH
+            - AttributeName: branchTimestamp
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      KeySchema:
+        - AttributeName: projectId
+          KeyType: HASH
+        - AttributeName: timestampEventId
+          KeyType: RANGE
+      TableName: flowsync-events
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncEvents/Resource
+  FlowSyncContext14878052:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: eventId
+          AttributeType: S
+        - AttributeName: projectId
+          AttributeType: S
+        - AttributeName: extractedAt
+          AttributeType: S
+        - AttributeName: branchExtractedAt
+          AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+      GlobalSecondaryIndexes:
+        - IndexName: ProjectContextIndex
+          KeySchema:
+            - AttributeName: projectId
+              KeyType: HASH
+            - AttributeName: extractedAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: BranchContextIndex
+          KeySchema:
+            - AttributeName: projectId
+              KeyType: HASH
+            - AttributeName: branchExtractedAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      KeySchema:
+        - AttributeName: eventId
+          KeyType: HASH
+      TableName: flowsync-context
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncContext/Resource
+  FlowSyncAudit69E9AE23:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: entityId
+          AttributeType: S
+        - AttributeName: timestamp
+          AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+        - AttributeName: entityId
+          KeyType: HASH
+        - AttributeName: timestamp
+          KeyType: RANGE
+      TableName: flowsync-audit
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncAudit/Resource
+  FlowSyncChatSessionsA68DAEB3:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: sessionId
+          AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+        - AttributeName: sessionId
+          KeyType: HASH
+      TableName: flowsync-chat-sessions
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncChatSessions/Resource
+  FlowSyncCache0BD34498:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: cacheKey
+          AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+        - AttributeName: cacheKey
+          KeyType: HASH
+      TableName: flowsync-cache
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncCache/Resource
+  FlowSyncIdempotency30742765:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: idempotencyKey
+          AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+        - AttributeName: idempotencyKey
+          KeyType: HASH
+      TableName: flowsync-idempotency
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncIdempotency/Resource
+  FlowSyncProjectRepoMapping14E65CB2:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: repositoryId
+          AttributeType: S
+        - AttributeName: projectId
+          AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+      GlobalSecondaryIndexes:
+        - IndexName: ProjectMappingIndex
+          KeySchema:
+            - AttributeName: projectId
+              KeyType: HASH
+            - AttributeName: repositoryId
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      KeySchema:
+        - AttributeName: repositoryId
+          KeyType: HASH
+      TableName: flowsync-project-repo-mapping
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncProjectRepoMapping/Resource
+  FlowSyncGraphEntitiesFBB9F6B8:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: entityId
+          AttributeType: S
+        - AttributeName: projectId
+          AttributeType: S
+        - AttributeName: entityType#createdAt
+          AttributeType: S
+        - AttributeName: repositoryId
+          AttributeType: S
+        - AttributeName: entityType
+          AttributeType: S
+        - AttributeName: createdAt
+          AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+      GlobalSecondaryIndexes:
+        - IndexName: ProjectEntityIndex
+          KeySchema:
+            - AttributeName: projectId
+              KeyType: HASH
+            - AttributeName: entityType#createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: RepositoryEntityIndex
+          KeySchema:
+            - AttributeName: repositoryId
+              KeyType: HASH
+            - AttributeName: entityType#createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: EntityTypeIndex
+          KeySchema:
+            - AttributeName: entityType
+              KeyType: HASH
+            - AttributeName: createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      KeySchema:
+        - AttributeName: entityId
+          KeyType: HASH
+      TableName: flowsync-graph-entities
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncGraphEntities/Resource
+  FlowSyncGraphRelationships78853F47:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: relationshipId
+          AttributeType: S
+        - AttributeName: sourceEntityId
+          AttributeType: S
+        - AttributeName: relationshipType#createdAt
+          AttributeType: S
+        - AttributeName: targetEntityId
+          AttributeType: S
+        - AttributeName: projectId
+          AttributeType: S
+        - AttributeName: relationshipType
+          AttributeType: S
+        - AttributeName: createdAt
+          AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+      GlobalSecondaryIndexes:
+        - IndexName: SourceEntityIndex
+          KeySchema:
+            - AttributeName: sourceEntityId
+              KeyType: HASH
+            - AttributeName: relationshipType#createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: TargetEntityIndex
+          KeySchema:
+            - AttributeName: targetEntityId
+              KeyType: HASH
+            - AttributeName: relationshipType#createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: ProjectRelationshipIndex
+          KeySchema:
+            - AttributeName: projectId
+              KeyType: HASH
+            - AttributeName: relationshipType#createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: RelationshipTypeIndex
+          KeySchema:
+            - AttributeName: relationshipType
+              KeyType: HASH
+            - AttributeName: createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      KeySchema:
+        - AttributeName: relationshipId
+          KeyType: HASH
+      TableName: flowsync-graph-relationships
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncGraphRelationships/Resource
+  FlowSyncRawEvents34E574F1:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName:
+        Fn::Join:
+          - ""
+          - - flowsync-raw-events-
+            - Ref: AWS::AccountId
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: aws-cdk:auto-delete-objects
+          Value: "true"
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncRawEvents/Resource
+  FlowSyncRawEventsPolicyEA9709C3:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket:
+        Ref: FlowSyncRawEvents34E574F1
+      PolicyDocument:
+        Statement:
+          - Action:
+              - s3:DeleteObject*
+              - s3:GetBucket*
+              - s3:List*
+              - s3:PutBucketPolicy
+            Effect: Allow
+            Principal:
+              AWS:
+                Fn::GetAtt:
+                  - CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092
+                  - Arn
+            Resource:
+              - Fn::GetAtt:
+                  - FlowSyncRawEvents34E574F1
+                  - Arn
+              - Fn::Join:
+                  - ""
+                  - - Fn::GetAtt:
+                        - FlowSyncRawEvents34E574F1
+                        - Arn
+                    - /*
+        Version: "2012-10-17"
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncRawEvents/Policy/Resource
+  FlowSyncRawEventsAutoDeleteObjectsCustomResourceC0A065DD:
+    Type: Custom::S3AutoDeleteObjects
+    Properties:
+      ServiceToken:
+        Fn::GetAtt:
+          - CustomS3AutoDeleteObjectsCustomResourceProviderHandler9D90184F
+          - Arn
+      BucketName:
+        Ref: FlowSyncRawEvents34E574F1
+    DependsOn:
+      - FlowSyncRawEventsPolicyEA9709C3
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncRawEvents/AutoDeleteObjectsCustomResource/Default
+  CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+      ManagedPolicyArns:
+        - Fn::Sub: arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+    Metadata:
+      aws:cdk:path: FlowSyncStack/Custom::S3AutoDeleteObjectsCustomResourceProvider/Role
+  CustomS3AutoDeleteObjectsCustomResourceProviderHandler9D90184F:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket:
+          Fn::Sub: cdk-hnb659fds-assets-${AWS::AccountId}-us-east-1
+        S3Key: faa95a81ae7d7373f3e1f242268f904eb748d8d0fdd306e8a6fe515a1905a7d6.zip
+      Timeout: 900
+      MemorySize: 128
+      Handler: index.handler
+      Role:
+        Fn::GetAtt:
+          - CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092
+          - Arn
+      Runtime: nodejs22.x
+      Description:
+        Fn::Join:
+          - ""
+          - - "Lambda function for auto-deleting objects in "
+            - Ref: FlowSyncRawEvents34E574F1
+            - " S3 bucket."
+    DependsOn:
+      - CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092
+    Metadata:
+      aws:cdk:path: FlowSyncStack/Custom::S3AutoDeleteObjectsCustomResourceProvider/Handler
+      aws:asset:path: asset.faa95a81ae7d7373f3e1f242268f904eb748d8d0fdd306e8a6fe515a1905a7d6
+      aws:asset:property: Code
+  FlowSyncDLQAAC41B11:
+    Type: AWS::SQS::Queue
+    Properties:
+      MessageRetentionPeriod: 1209600
+      QueueName: flowsync-dlq
+      SqsManagedSseEnabled: true
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncDLQ/Resource
+  FlowSyncProcessingQueueC75EF78F:
+    Type: AWS::SQS::Queue
+    Properties:
+      MessageRetentionPeriod: 345600
+      QueueName: flowsync-processing
+      ReceiveMessageWaitTimeSeconds: 20
+      RedrivePolicy:
+        deadLetterTargetArn:
+          Fn::GetAtt:
+            - FlowSyncDLQAAC41B11
+            - Arn
+        maxReceiveCount: 3
+      SqsManagedSseEnabled: true
+      VisibilityTimeout: 90
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncProcessingQueue/Resource
+  FlowSyncSharedLayerE1A1CBBF:
+    Type: AWS::Lambda::LayerVersion
+    Properties:
+      CompatibleRuntimes:
+        - python3.12
+      Content:
+        S3Bucket:
+          Fn::Sub: cdk-hnb659fds-assets-${AWS::AccountId}-us-east-1
+        S3Key: 2f9b572603a89cf1f9de20e8d475c8585c2eb3a5146dc7869938723d75a5ad86.zip
+      Description: Shared utilities for MCP and Query Lambda functions
+      LayerName: flowsync-shared-layer
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncSharedLayer/Resource
+      aws:asset:path: asset.2f9b572603a89cf1f9de20e8d475c8585c2eb3a5146dc7869938723d75a5ad86
+      aws:asset:is-bundled: false
+      aws:asset:property: Content
+  IngestionFnServiceRole74590F09:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+        Version: "2012-10-17"
+      ManagedPolicyArns:
+        - Fn::Join:
+            - ""
+            - - "arn:"
+              - Ref: AWS::Partition
+              - :iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+    Metadata:
+      aws:cdk:path: FlowSyncStack/IngestionFn/ServiceRole/Resource
+  IngestionFnServiceRoleDefaultPolicyB1D824B3:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action:
+              - dynamodb:BatchGetItem
+              - dynamodb:BatchWriteItem
+              - dynamodb:ConditionCheckItem
+              - dynamodb:DeleteItem
+              - dynamodb:DescribeTable
+              - dynamodb:GetItem
+              - dynamodb:GetRecords
+              - dynamodb:GetShardIterator
+              - dynamodb:PutItem
+              - dynamodb:Query
+              - dynamodb:Scan
+              - dynamodb:UpdateItem
+            Effect: Allow
+            Resource:
+              - Fn::GetAtt:
+                  - FlowSyncAudit69E9AE23
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncCache0BD34498
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncChatSessionsA68DAEB3
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncContext14878052
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncEventsFFDBD9A2
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncGraphEntitiesFBB9F6B8
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncGraphRelationships78853F47
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncIdempotency30742765
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncProjectRepoMapping14E65CB2
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncProjectsCDF862F6
+                  - Arn
+              - Fn::Join:
+                  - ""
+                  - - Fn::GetAtt:
+                        - FlowSyncContext14878052
+                        - Arn
+                    - /index/*
+              - Fn::Join:
+                  - ""
+                  - - Fn::GetAtt:
+                        - FlowSyncEventsFFDBD9A2
+                        - Arn
+                    - /index/*
+              - Fn::Join:
+                  - ""
+                  - - Fn::GetAtt:
+                        - FlowSyncGraphEntitiesFBB9F6B8
+                        - Arn
+                    - /index/*
+              - Fn::Join:
+                  - ""
+                  - - Fn::GetAtt:
+                        - FlowSyncGraphRelationships78853F47
+                        - Arn
+                    - /index/*
+              - Fn::Join:
+                  - ""
+                  - - Fn::GetAtt:
+                        - FlowSyncProjectRepoMapping14E65CB2
+                        - Arn
+                    - /index/*
+          - Action:
+              - s3:Abort*
+              - s3:PutObject
+              - s3:PutObjectLegalHold
+              - s3:PutObjectRetention
+              - s3:PutObjectTagging
+              - s3:PutObjectVersionTagging
+            Effect: Allow
+            Resource:
+              Fn::Join:
+                - ""
+                - - Fn::GetAtt:
+                      - FlowSyncRawEvents34E574F1
+                      - Arn
+                  - /*
+          - Action:
+              - sqs:GetQueueAttributes
+              - sqs:GetQueueUrl
+              - sqs:SendMessage
+            Effect: Allow
+            Resource:
+              Fn::GetAtt:
+                - FlowSyncProcessingQueueC75EF78F
+                - Arn
+        Version: "2012-10-17"
+      PolicyName: IngestionFnServiceRoleDefaultPolicyB1D824B3
+      Roles:
+        - Ref: IngestionFnServiceRole74590F09
+    Metadata:
+      aws:cdk:path: FlowSyncStack/IngestionFn/ServiceRole/DefaultPolicy/Resource
+  IngestionFn233E043F:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket:
+          Fn::Sub: cdk-hnb659fds-assets-${AWS::AccountId}-us-east-1
+        S3Key: 91bb4f6a890cfcbdfaead608a85155287942cfc467e690b8ede1640af79023e0.zip
+      Environment:
+        Variables:
+          PROJECTS_TABLE:
+            Ref: FlowSyncProjectsCDF862F6
+          EVENTS_TABLE:
+            Ref: FlowSyncEventsFFDBD9A2
+          CONTEXT_TABLE:
+            Ref: FlowSyncContext14878052
+          AUDIT_TABLE:
+            Ref: FlowSyncAudit69E9AE23
+          RAW_EVENTS_BUCKET:
+            Ref: FlowSyncRawEvents34E574F1
+          PROCESSING_QUEUE_URL:
+            Ref: FlowSyncProcessingQueueC75EF78F
+          PROJECT_REPO_MAPPING_TABLE:
+            Ref: FlowSyncProjectRepoMapping14E65CB2
+      FunctionName: flowsync-ingestion
+      Handler: index.handler
+      MemorySize: 256
+      Role:
+        Fn::GetAtt:
+          - IngestionFnServiceRole74590F09
+          - Arn
+      Runtime: nodejs20.x
+      Timeout: 10
+    DependsOn:
+      - IngestionFnServiceRoleDefaultPolicyB1D824B3
+      - IngestionFnServiceRole74590F09
+    Metadata:
+      aws:cdk:path: FlowSyncStack/IngestionFn/Resource
+      aws:asset:path: asset.91bb4f6a890cfcbdfaead608a85155287942cfc467e690b8ede1640af79023e0
+      aws:asset:is-bundled: false
+      aws:asset:property: Code
+  IngestionFnLogGroup73B1EF80:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName:
+        Fn::Join:
+          - ""
+          - - /aws/lambda/
+            - Ref: IngestionFn233E043F
+      RetentionInDays: 731
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Metadata:
+      aws:cdk:path: FlowSyncStack/IngestionFn/LogGroup/Resource
+  AiProcessingFnServiceRoleF40CCFA0:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+        Version: "2012-10-17"
+      ManagedPolicyArns:
+        - Fn::Join:
+            - ""
+            - - "arn:"
+              - Ref: AWS::Partition
+              - :iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+    Metadata:
+      aws:cdk:path: FlowSyncStack/AiProcessingFn/ServiceRole/Resource
+  AiProcessingFnServiceRoleDefaultPolicy8993785C:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action:
+              - bedrock:Converse
+              - bedrock:InvokeModel
+            Effect: Allow
+            Resource:
+              - arn:aws:bedrock:*::foundation-model/amazon.nova-lite-v1:0
+              - arn:aws:bedrock:*::foundation-model/amazon.nova-pro-v1:0
+              - arn:aws:bedrock:us-east-1:357229249502:inference-profile/us.amazon.nova-lite-v1:0
+              - arn:aws:bedrock:us-east-1:357229249502:inference-profile/us.amazon.nova-pro-v1:0
+              - arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-text-v1
+              - arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-text-v2:0
+          - Action:
+              - sqs:ChangeMessageVisibility
+              - sqs:DeleteMessage
+              - sqs:GetQueueAttributes
+              - sqs:GetQueueUrl
+              - sqs:ReceiveMessage
+            Effect: Allow
+            Resource:
+              Fn::GetAtt:
+                - FlowSyncProcessingQueueC75EF78F
+                - Arn
+          - Action:
+              - dynamodb:BatchGetItem
+              - dynamodb:BatchWriteItem
+              - dynamodb:ConditionCheckItem
+              - dynamodb:DeleteItem
+              - dynamodb:DescribeTable
+              - dynamodb:GetItem
+              - dynamodb:GetRecords
+              - dynamodb:GetShardIterator
+              - dynamodb:PutItem
+              - dynamodb:Query
+              - dynamodb:Scan
+              - dynamodb:UpdateItem
+            Effect: Allow
+            Resource:
+              - Fn::GetAtt:
+                  - FlowSyncAudit69E9AE23
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncCache0BD34498
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncChatSessionsA68DAEB3
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncContext14878052
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncEventsFFDBD9A2
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncGraphEntitiesFBB9F6B8
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncGraphRelationships78853F47
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncIdempotency30742765
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncProjectRepoMapping14E65CB2
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncProjectsCDF862F6
+                  - Arn
+              - Fn::Join:
+                  - ""
+                  - - Fn::GetAtt:
+                        - FlowSyncContext14878052
+                        - Arn
+                    - /index/*
+              - Fn::Join:
+                  - ""
+                  - - Fn::GetAtt:
+                        - FlowSyncEventsFFDBD9A2
+                        - Arn
+                    - /index/*
+              - Fn::Join:
+                  - ""
+                  - - Fn::GetAtt:
+                        - FlowSyncGraphEntitiesFBB9F6B8
+                        - Arn
+                    - /index/*
+              - Fn::Join:
+                  - ""
+                  - - Fn::GetAtt:
+                        - FlowSyncGraphRelationships78853F47
+                        - Arn
+                    - /index/*
+              - Fn::Join:
+                  - ""
+                  - - Fn::GetAtt:
+                        - FlowSyncProjectRepoMapping14E65CB2
+                        - Arn
+                    - /index/*
+        Version: "2012-10-17"
+      PolicyName: AiProcessingFnServiceRoleDefaultPolicy8993785C
+      Roles:
+        - Ref: AiProcessingFnServiceRoleF40CCFA0
+    Metadata:
+      aws:cdk:path: FlowSyncStack/AiProcessingFn/ServiceRole/DefaultPolicy/Resource
+  AiProcessingFn60BE2B85:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket:
+          Fn::Sub: cdk-hnb659fds-assets-${AWS::AccountId}-us-east-1
+        S3Key: 8991d93f1e7939e835315d6751978a89874698da6f98cae0d8965d8eba88b53e.zip
+      Environment:
+        Variables:
+          PROJECTS_TABLE:
+            Ref: FlowSyncProjectsCDF862F6
+          EVENTS_TABLE:
+            Ref: FlowSyncEventsFFDBD9A2
+          CONTEXT_TABLE:
+            Ref: FlowSyncContext14878052
+          AUDIT_TABLE:
+            Ref: FlowSyncAudit69E9AE23
+          IDEMPOTENCY_TABLE:
+            Ref: FlowSyncIdempotency30742765
+          GRAPH_ENTITIES_TABLE:
+            Ref: FlowSyncGraphEntitiesFBB9F6B8
+          GRAPH_RELATIONSHIPS_TABLE:
+            Ref: FlowSyncGraphRelationships78853F47
+          FALLBACK_MODEL_ID: us.amazon.nova-lite-v1:0
+      FunctionName: flowsync-ai-processing
+      Handler: handler.handler
+      MemorySize: 512
+      Role:
+        Fn::GetAtt:
+          - AiProcessingFnServiceRoleF40CCFA0
+          - Arn
+      Runtime: python3.12
+      Timeout: 60
+    DependsOn:
+      - AiProcessingFnServiceRoleDefaultPolicy8993785C
+      - AiProcessingFnServiceRoleF40CCFA0
+    Metadata:
+      aws:cdk:path: FlowSyncStack/AiProcessingFn/Resource
+      aws:asset:path: asset.8991d93f1e7939e835315d6751978a89874698da6f98cae0d8965d8eba88b53e
+      aws:asset:is-bundled: false
+      aws:asset:property: Code
+  AiProcessingFnLogGroup24444C0D:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName:
+        Fn::Join:
+          - ""
+          - - /aws/lambda/
+            - Ref: AiProcessingFn60BE2B85
+      RetentionInDays: 731
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Metadata:
+      aws:cdk:path: FlowSyncStack/AiProcessingFn/LogGroup/Resource
+  AiProcessingFnSqsEventSourceFlowSyncStackFlowSyncProcessingQueue38AEB65B31480499:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      BatchSize: 5
+      EventSourceArn:
+        Fn::GetAtt:
+          - FlowSyncProcessingQueueC75EF78F
+          - Arn
+      FunctionName:
+        Ref: AiProcessingFn60BE2B85
+      FunctionResponseTypes:
+        - ReportBatchItemFailures
+      MaximumBatchingWindowInSeconds: 30
+    Metadata:
+      aws:cdk:path: FlowSyncStack/AiProcessingFn/SqsEventSource:FlowSyncStackFlowSyncProcessingQueue38AEB65B/Resource
+  McpFnServiceRole14873AF3:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+        Version: "2012-10-17"
+      ManagedPolicyArns:
+        - Fn::Join:
+            - ""
+            - - "arn:"
+              - Ref: AWS::Partition
+              - :iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+    Metadata:
+      aws:cdk:path: FlowSyncStack/McpFn/ServiceRole/Resource
+  McpFnServiceRoleDefaultPolicy06B23653:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action:
+              - bedrock:Converse
+              - bedrock:InvokeModel
+            Effect: Allow
+            Resource:
+              - arn:aws:bedrock:*::foundation-model/amazon.nova-lite-v1:0
+              - arn:aws:bedrock:*::foundation-model/amazon.nova-pro-v1:0
+              - arn:aws:bedrock:us-east-1:357229249502:inference-profile/us.amazon.nova-lite-v1:0
+              - arn:aws:bedrock:us-east-1:357229249502:inference-profile/us.amazon.nova-pro-v1:0
+              - arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-text-v1
+              - arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-text-v2:0
+          - Action:
+              - dynamodb:BatchGetItem
+              - dynamodb:BatchWriteItem
+              - dynamodb:ConditionCheckItem
+              - dynamodb:DeleteItem
+              - dynamodb:DescribeTable
+              - dynamodb:GetItem
+              - dynamodb:GetRecords
+              - dynamodb:GetShardIterator
+              - dynamodb:PutItem
+              - dynamodb:Query
+              - dynamodb:Scan
+              - dynamodb:UpdateItem
+            Effect: Allow
+            Resource:
+              - Fn::GetAtt:
+                  - FlowSyncAudit69E9AE23
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncCache0BD34498
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncChatSessionsA68DAEB3
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncContext14878052
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncEventsFFDBD9A2
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncGraphEntitiesFBB9F6B8
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncGraphRelationships78853F47
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncIdempotency30742765
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncProjectRepoMapping14E65CB2
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncProjectsCDF862F6
+                  - Arn
+              - Fn::Join:
+                  - ""
+                  - - Fn::GetAtt:
+                        - FlowSyncContext14878052
+                        - Arn
+                    - /index/*
+              - Fn::Join:
+                  - ""
+                  - - Fn::GetAtt:
+                        - FlowSyncEventsFFDBD9A2
+                        - Arn
+                    - /index/*
+              - Fn::Join:
+                  - ""
+                  - - Fn::GetAtt:
+                        - FlowSyncGraphEntitiesFBB9F6B8
+                        - Arn
+                    - /index/*
+              - Fn::Join:
+                  - ""
+                  - - Fn::GetAtt:
+                        - FlowSyncGraphRelationships78853F47
+                        - Arn
+                    - /index/*
+              - Fn::Join:
+                  - ""
+                  - - Fn::GetAtt:
+                        - FlowSyncProjectRepoMapping14E65CB2
+                        - Arn
+                    - /index/*
+        Version: "2012-10-17"
+      PolicyName: McpFnServiceRoleDefaultPolicy06B23653
+      Roles:
+        - Ref: McpFnServiceRole14873AF3
+    Metadata:
+      aws:cdk:path: FlowSyncStack/McpFn/ServiceRole/DefaultPolicy/Resource
+  McpFnFE65A12E:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket:
+          Fn::Sub: cdk-hnb659fds-assets-${AWS::AccountId}-us-east-1
+        S3Key: 9666e85532fcb4d1eaac53319e8da741f00991129b6f351e16b2e83947b978ca.zip
+      Environment:
+        Variables:
+          PROJECTS_TABLE:
+            Ref: FlowSyncProjectsCDF862F6
+          CONTEXT_TABLE:
+            Ref: FlowSyncContext14878052
+          AUDIT_TABLE:
+            Ref: FlowSyncAudit69E9AE23
+          FALLBACK_MODEL_ID: us.amazon.nova-lite-v1:0
+          CACHE_TABLE:
+            Ref: FlowSyncCache0BD34498
+      FunctionName: flowsync-mcp
+      Handler: handler.handler
+      Layers:
+        - Ref: FlowSyncSharedLayerE1A1CBBF
+      MemorySize: 256
+      Role:
+        Fn::GetAtt:
+          - McpFnServiceRole14873AF3
+          - Arn
+      Runtime: python3.12
+      Timeout: 30
+    DependsOn:
+      - McpFnServiceRoleDefaultPolicy06B23653
+      - McpFnServiceRole14873AF3
+    Metadata:
+      aws:cdk:path: FlowSyncStack/McpFn/Resource
+      aws:asset:path: asset.9666e85532fcb4d1eaac53319e8da741f00991129b6f351e16b2e83947b978ca
+      aws:asset:is-bundled: false
+      aws:asset:property: Code
+  McpFnLogGroupAC2D4F7D:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName:
+        Fn::Join:
+          - ""
+          - - /aws/lambda/
+            - Ref: McpFnFE65A12E
+      RetentionInDays: 731
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Metadata:
+      aws:cdk:path: FlowSyncStack/McpFn/LogGroup/Resource
+  QueryFnServiceRoleF1C814DC:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+        Version: "2012-10-17"
+      ManagedPolicyArns:
+        - Fn::Join:
+            - ""
+            - - "arn:"
+              - Ref: AWS::Partition
+              - :iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+    Metadata:
+      aws:cdk:path: FlowSyncStack/QueryFn/ServiceRole/Resource
+  QueryFnServiceRoleDefaultPolicyCC7ECEB2:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action:
+              - bedrock:Converse
+              - bedrock:InvokeModel
+            Effect: Allow
+            Resource:
+              - arn:aws:bedrock:*::foundation-model/amazon.nova-lite-v1:0
+              - arn:aws:bedrock:*::foundation-model/amazon.nova-pro-v1:0
+              - arn:aws:bedrock:us-east-1:357229249502:inference-profile/us.amazon.nova-lite-v1:0
+              - arn:aws:bedrock:us-east-1:357229249502:inference-profile/us.amazon.nova-pro-v1:0
+              - arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-text-v1
+              - arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-text-v2:0
+          - Action:
+              - dynamodb:BatchGetItem
+              - dynamodb:BatchWriteItem
+              - dynamodb:ConditionCheckItem
+              - dynamodb:DeleteItem
+              - dynamodb:DescribeTable
+              - dynamodb:GetItem
+              - dynamodb:GetRecords
+              - dynamodb:GetShardIterator
+              - dynamodb:PutItem
+              - dynamodb:Query
+              - dynamodb:Scan
+              - dynamodb:UpdateItem
+            Effect: Allow
+            Resource:
+              - Fn::GetAtt:
+                  - FlowSyncAudit69E9AE23
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncCache0BD34498
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncChatSessionsA68DAEB3
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncContext14878052
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncEventsFFDBD9A2
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncGraphEntitiesFBB9F6B8
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncGraphRelationships78853F47
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncIdempotency30742765
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncProjectRepoMapping14E65CB2
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncProjectsCDF862F6
+                  - Arn
+              - Fn::Join:
+                  - ""
+                  - - Fn::GetAtt:
+                        - FlowSyncContext14878052
+                        - Arn
+                    - /index/*
+              - Fn::Join:
+                  - ""
+                  - - Fn::GetAtt:
+                        - FlowSyncEventsFFDBD9A2
+                        - Arn
+                    - /index/*
+              - Fn::Join:
+                  - ""
+                  - - Fn::GetAtt:
+                        - FlowSyncGraphEntitiesFBB9F6B8
+                        - Arn
+                    - /index/*
+              - Fn::Join:
+                  - ""
+                  - - Fn::GetAtt:
+                        - FlowSyncGraphRelationships78853F47
+                        - Arn
+                    - /index/*
+              - Fn::Join:
+                  - ""
+                  - - Fn::GetAtt:
+                        - FlowSyncProjectRepoMapping14E65CB2
+                        - Arn
+                    - /index/*
+        Version: "2012-10-17"
+      PolicyName: QueryFnServiceRoleDefaultPolicyCC7ECEB2
+      Roles:
+        - Ref: QueryFnServiceRoleF1C814DC
+    Metadata:
+      aws:cdk:path: FlowSyncStack/QueryFn/ServiceRole/DefaultPolicy/Resource
+  QueryFnB2E9AD3D:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket:
+          Fn::Sub: cdk-hnb659fds-assets-${AWS::AccountId}-us-east-1
+        S3Key: 1e7fe15c4e46878a7a8a395e15bb06ab87e3da3f7db00ccaff5fff801d3af413.zip
+      Environment:
+        Variables:
+          PROJECTS_TABLE:
+            Ref: FlowSyncProjectsCDF862F6
+          CONTEXT_TABLE:
+            Ref: FlowSyncContext14878052
+          FALLBACK_MODEL_ID: us.amazon.nova-lite-v1:0
+          CACHE_TABLE:
+            Ref: FlowSyncCache0BD34498
+      FunctionName: flowsync-query
+      Handler: handler.handler
+      Layers:
+        - Ref: FlowSyncSharedLayerE1A1CBBF
+      MemorySize: 256
+      Role:
+        Fn::GetAtt:
+          - QueryFnServiceRoleF1C814DC
+          - Arn
+      Runtime: python3.12
+      Timeout: 30
+    DependsOn:
+      - QueryFnServiceRoleDefaultPolicyCC7ECEB2
+      - QueryFnServiceRoleF1C814DC
+    Metadata:
+      aws:cdk:path: FlowSyncStack/QueryFn/Resource
+      aws:asset:path: asset.1e7fe15c4e46878a7a8a395e15bb06ab87e3da3f7db00ccaff5fff801d3af413
+      aws:asset:is-bundled: false
+      aws:asset:property: Code
+  QueryFnLogGroupB4B536F2:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName:
+        Fn::Join:
+          - ""
+          - - /aws/lambda/
+            - Ref: QueryFnB2E9AD3D
+      RetentionInDays: 731
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Metadata:
+      aws:cdk:path: FlowSyncStack/QueryFn/LogGroup/Resource
+  ChatFnServiceRoleC3825F1B:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+        Version: "2012-10-17"
+      ManagedPolicyArns:
+        - Fn::Join:
+            - ""
+            - - "arn:"
+              - Ref: AWS::Partition
+              - :iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+    Metadata:
+      aws:cdk:path: FlowSyncStack/ChatFn/ServiceRole/Resource
+  ChatFnServiceRoleDefaultPolicyD5F3AC4B:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action:
+              - bedrock:Converse
+              - bedrock:InvokeModel
+            Effect: Allow
+            Resource:
+              - arn:aws:bedrock:*::foundation-model/amazon.nova-lite-v1:0
+              - arn:aws:bedrock:*::foundation-model/amazon.nova-pro-v1:0
+              - arn:aws:bedrock:us-east-1:357229249502:inference-profile/us.amazon.nova-lite-v1:0
+              - arn:aws:bedrock:us-east-1:357229249502:inference-profile/us.amazon.nova-pro-v1:0
+              - arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-text-v1
+              - arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-text-v2:0
+          - Action:
+              - dynamodb:BatchGetItem
+              - dynamodb:BatchWriteItem
+              - dynamodb:ConditionCheckItem
+              - dynamodb:DeleteItem
+              - dynamodb:DescribeTable
+              - dynamodb:GetItem
+              - dynamodb:GetRecords
+              - dynamodb:GetShardIterator
+              - dynamodb:PutItem
+              - dynamodb:Query
+              - dynamodb:Scan
+              - dynamodb:UpdateItem
+            Effect: Allow
+            Resource:
+              - Fn::GetAtt:
+                  - FlowSyncAudit69E9AE23
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncCache0BD34498
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncChatSessionsA68DAEB3
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncContext14878052
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncEventsFFDBD9A2
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncGraphEntitiesFBB9F6B8
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncGraphRelationships78853F47
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncIdempotency30742765
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncProjectRepoMapping14E65CB2
+                  - Arn
+              - Fn::GetAtt:
+                  - FlowSyncProjectsCDF862F6
+                  - Arn
+              - Fn::Join:
+                  - ""
+                  - - Fn::GetAtt:
+                        - FlowSyncContext14878052
+                        - Arn
+                    - /index/*
+              - Fn::Join:
+                  - ""
+                  - - Fn::GetAtt:
+                        - FlowSyncEventsFFDBD9A2
+                        - Arn
+                    - /index/*
+              - Fn::Join:
+                  - ""
+                  - - Fn::GetAtt:
+                        - FlowSyncGraphEntitiesFBB9F6B8
+                        - Arn
+                    - /index/*
+              - Fn::Join:
+                  - ""
+                  - - Fn::GetAtt:
+                        - FlowSyncGraphRelationships78853F47
+                        - Arn
+                    - /index/*
+              - Fn::Join:
+                  - ""
+                  - - Fn::GetAtt:
+                        - FlowSyncProjectRepoMapping14E65CB2
+                        - Arn
+                    - /index/*
+        Version: "2012-10-17"
+      PolicyName: ChatFnServiceRoleDefaultPolicyD5F3AC4B
+      Roles:
+        - Ref: ChatFnServiceRoleC3825F1B
+    Metadata:
+      aws:cdk:path: FlowSyncStack/ChatFn/ServiceRole/DefaultPolicy/Resource
+  ChatFn5A5B3E47:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket:
+          Fn::Sub: cdk-hnb659fds-assets-${AWS::AccountId}-us-east-1
+        S3Key: be8c29d95a7d713e6bcb481dcceae15cd332df1b36700078271b1ffae296068e.zip
+      Environment:
+        Variables:
+          PROJECT_TABLE_NAME:
+            Ref: FlowSyncProjectsCDF862F6
+          CONTEXT_TABLE_NAME:
+            Ref: FlowSyncContext14878052
+          SESSIONS_TABLE_NAME:
+            Ref: FlowSyncChatSessionsA68DAEB3
+          FALLBACK_MODEL_ID: us.amazon.nova-lite-v1:0
+          CACHE_TABLE_NAME:
+            Ref: FlowSyncCache0BD34498
+      FunctionName: flowsync-chat
+      Handler: handler.lambda_handler
+      Layers:
+        - Ref: FlowSyncSharedLayerE1A1CBBF
+      MemorySize: 512
+      Role:
+        Fn::GetAtt:
+          - ChatFnServiceRoleC3825F1B
+          - Arn
+      Runtime: python3.12
+      Timeout: 30
+    DependsOn:
+      - ChatFnServiceRoleDefaultPolicyD5F3AC4B
+      - ChatFnServiceRoleC3825F1B
+    Metadata:
+      aws:cdk:path: FlowSyncStack/ChatFn/Resource
+      aws:asset:path: asset.be8c29d95a7d713e6bcb481dcceae15cd332df1b36700078271b1ffae296068e
+      aws:asset:is-bundled: false
+      aws:asset:property: Code
+  ChatFnLogGroupAF372620:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName:
+        Fn::Join:
+          - ""
+          - - /aws/lambda/
+            - Ref: ChatFn5A5B3E47
+      RetentionInDays: 731
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Metadata:
+      aws:cdk:path: FlowSyncStack/ChatFn/LogGroup/Resource
+  FlowSyncApi8B5EDC74:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: flowsync-api
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Resource
+  FlowSyncApiDeployment8484F5F14af275f40a874119d8ccb602147aba0e:
+    Type: AWS::ApiGateway::Deployment
+    Properties:
+      Description: Automatically created by the RestApi construct
+      RestApiId:
+        Ref: FlowSyncApi8B5EDC74
+    DependsOn:
+      - FlowSyncApiapiOPTIONS39AAC273
+      - FlowSyncApiapi456C6CF2
+      - FlowSyncApiapiv1chatOPTIONSA10E9653
+      - FlowSyncApiapiv1chatPOST964D3207
+      - FlowSyncApiapiv1chat56E1CE42
+      - FlowSyncApiapiv1eventsOPTIONS15C4CF8D
+      - FlowSyncApiapiv1eventsPOST8E9FB397
+      - FlowSyncApiapiv1events914CF222
+      - FlowSyncApiapiv1OPTIONSFE4C1356
+      - FlowSyncApiapiv1projectsprojectIdeventsGETF30FEC0C
+      - FlowSyncApiapiv1projectsprojectIdeventsOPTIONSF8A893C9
+      - FlowSyncApiapiv1projectsprojectIdeventsE5932858
+      - FlowSyncApiapiv1projectsprojectIdGET286BB33E
+      - FlowSyncApiapiv1projectsprojectIdOPTIONS4598F52E
+      - FlowSyncApiapiv1projectsprojectId89B4976C
+      - FlowSyncApiapiv1projectsOPTIONSA4102F88
+      - FlowSyncApiapiv1projectsPOST17C0B2DD
+      - FlowSyncApiapiv1projects0A77EEE0
+      - FlowSyncApiapiv1queryOPTIONSC04AF1FD
+      - FlowSyncApiapiv1queryPOSTEA923A72
+      - FlowSyncApiapiv1query64A60190
+      - FlowSyncApiapiv15FABA006
+      - FlowSyncApimcpOPTIONS852BEF16
+      - FlowSyncApimcpPOST32252394
+      - FlowSyncApimcp78622468
+      - FlowSyncApiOPTIONS0DE9F191
+      - FlowSyncApiwebhooksgithubOPTIONS3DFEA51A
+      - FlowSyncApiwebhooksgithubPOST5E177776
+      - FlowSyncApiwebhooksgithubD05671F4
+      - FlowSyncApiwebhooksOPTIONS91515850
+      - FlowSyncApiwebhooks58390542
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Deployment/Resource
+      aws:cdk:do-not-refactor: true
+  FlowSyncApiDeploymentStageprod623554D2:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      DeploymentId:
+        Ref: FlowSyncApiDeployment8484F5F14af275f40a874119d8ccb602147aba0e
+      RestApiId:
+        Ref: FlowSyncApi8B5EDC74
+      StageName: prod
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/DeploymentStage.prod/Resource
+  FlowSyncApiOPTIONS0DE9F191:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ApiKeyRequired: false
+      AuthorizationType: NONE
+      HttpMethod: OPTIONS
+      Integration:
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
+            StatusCode: "204"
+        RequestTemplates:
+          application/json: "{ statusCode: 200 }"
+        Type: MOCK
+      MethodResponses:
+        - ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Methods: true
+          StatusCode: "204"
+      ResourceId:
+        Fn::GetAtt:
+          - FlowSyncApi8B5EDC74
+          - RootResourceId
+      RestApiId:
+        Ref: FlowSyncApi8B5EDC74
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/OPTIONS/Resource
+  FlowSyncApiapi456C6CF2:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId:
+        Fn::GetAtt:
+          - FlowSyncApi8B5EDC74
+          - RootResourceId
+      PathPart: api
+      RestApiId:
+        Ref: FlowSyncApi8B5EDC74
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/api/Resource
+  FlowSyncApiapiOPTIONS39AAC273:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ApiKeyRequired: false
+      AuthorizationType: NONE
+      HttpMethod: OPTIONS
+      Integration:
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
+            StatusCode: "204"
+        RequestTemplates:
+          application/json: "{ statusCode: 200 }"
+        Type: MOCK
+      MethodResponses:
+        - ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Methods: true
+          StatusCode: "204"
+      ResourceId:
+        Ref: FlowSyncApiapi456C6CF2
+      RestApiId:
+        Ref: FlowSyncApi8B5EDC74
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/api/OPTIONS/Resource
+  FlowSyncApiapiv15FABA006:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId:
+        Ref: FlowSyncApiapi456C6CF2
+      PathPart: v1
+      RestApiId:
+        Ref: FlowSyncApi8B5EDC74
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/api/v1/Resource
+  FlowSyncApiapiv1OPTIONSFE4C1356:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ApiKeyRequired: false
+      AuthorizationType: NONE
+      HttpMethod: OPTIONS
+      Integration:
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
+            StatusCode: "204"
+        RequestTemplates:
+          application/json: "{ statusCode: 200 }"
+        Type: MOCK
+      MethodResponses:
+        - ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Methods: true
+          StatusCode: "204"
+      ResourceId:
+        Ref: FlowSyncApiapiv15FABA006
+      RestApiId:
+        Ref: FlowSyncApi8B5EDC74
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/api/v1/OPTIONS/Resource
+  FlowSyncApiapiv1events914CF222:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId:
+        Ref: FlowSyncApiapiv15FABA006
+      PathPart: events
+      RestApiId:
+        Ref: FlowSyncApi8B5EDC74
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/api/v1/events/Resource
+  FlowSyncApiapiv1eventsOPTIONS15C4CF8D:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ApiKeyRequired: false
+      AuthorizationType: NONE
+      HttpMethod: OPTIONS
+      Integration:
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
+            StatusCode: "204"
+        RequestTemplates:
+          application/json: "{ statusCode: 200 }"
+        Type: MOCK
+      MethodResponses:
+        - ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Methods: true
+          StatusCode: "204"
+      ResourceId:
+        Ref: FlowSyncApiapiv1events914CF222
+      RestApiId:
+        Ref: FlowSyncApi8B5EDC74
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/api/v1/events/OPTIONS/Resource
+  FlowSyncApiapiv1eventsPOSTApiPermissionFlowSyncStackFlowSyncApi7A767D5FPOSTapiv1events285ADD8D:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::GetAtt:
+          - IngestionFn233E043F
+          - Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Join:
+          - ""
+          - - "arn:aws:execute-api:us-east-1:"
+            - Ref: AWS::AccountId
+            - ":"
+            - Ref: FlowSyncApi8B5EDC74
+            - /
+            - Ref: FlowSyncApiDeploymentStageprod623554D2
+            - /POST/api/v1/events
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/api/v1/events/POST/ApiPermission.FlowSyncStackFlowSyncApi7A767D5F.POST..api.v1.events
+  FlowSyncApiapiv1eventsPOSTApiPermissionTestFlowSyncStackFlowSyncApi7A767D5FPOSTapiv1events468488C7:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::GetAtt:
+          - IngestionFn233E043F
+          - Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Join:
+          - ""
+          - - "arn:aws:execute-api:us-east-1:"
+            - Ref: AWS::AccountId
+            - ":"
+            - Ref: FlowSyncApi8B5EDC74
+            - /test-invoke-stage/POST/api/v1/events
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/api/v1/events/POST/ApiPermission.Test.FlowSyncStackFlowSyncApi7A767D5F.POST..api.v1.events
+  FlowSyncApiapiv1eventsPOST8E9FB397:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: POST
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri:
+          Fn::Join:
+            - ""
+            - - arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/
+              - Fn::GetAtt:
+                  - IngestionFn233E043F
+                  - Arn
+              - /invocations
+      ResourceId:
+        Ref: FlowSyncApiapiv1events914CF222
+      RestApiId:
+        Ref: FlowSyncApi8B5EDC74
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/api/v1/events/POST/Resource
+  FlowSyncApiapiv1projects0A77EEE0:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId:
+        Ref: FlowSyncApiapiv15FABA006
+      PathPart: projects
+      RestApiId:
+        Ref: FlowSyncApi8B5EDC74
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/api/v1/projects/Resource
+  FlowSyncApiapiv1projectsOPTIONSA4102F88:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ApiKeyRequired: false
+      AuthorizationType: NONE
+      HttpMethod: OPTIONS
+      Integration:
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
+            StatusCode: "204"
+        RequestTemplates:
+          application/json: "{ statusCode: 200 }"
+        Type: MOCK
+      MethodResponses:
+        - ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Methods: true
+          StatusCode: "204"
+      ResourceId:
+        Ref: FlowSyncApiapiv1projects0A77EEE0
+      RestApiId:
+        Ref: FlowSyncApi8B5EDC74
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/api/v1/projects/OPTIONS/Resource
+  FlowSyncApiapiv1projectsPOSTApiPermissionFlowSyncStackFlowSyncApi7A767D5FPOSTapiv1projects6049FADA:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::GetAtt:
+          - IngestionFn233E043F
+          - Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Join:
+          - ""
+          - - "arn:aws:execute-api:us-east-1:"
+            - Ref: AWS::AccountId
+            - ":"
+            - Ref: FlowSyncApi8B5EDC74
+            - /
+            - Ref: FlowSyncApiDeploymentStageprod623554D2
+            - /POST/api/v1/projects
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/api/v1/projects/POST/ApiPermission.FlowSyncStackFlowSyncApi7A767D5F.POST..api.v1.projects
+  FlowSyncApiapiv1projectsPOSTApiPermissionTestFlowSyncStackFlowSyncApi7A767D5FPOSTapiv1projects36ABCB56:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::GetAtt:
+          - IngestionFn233E043F
+          - Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Join:
+          - ""
+          - - "arn:aws:execute-api:us-east-1:"
+            - Ref: AWS::AccountId
+            - ":"
+            - Ref: FlowSyncApi8B5EDC74
+            - /test-invoke-stage/POST/api/v1/projects
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/api/v1/projects/POST/ApiPermission.Test.FlowSyncStackFlowSyncApi7A767D5F.POST..api.v1.projects
+  FlowSyncApiapiv1projectsPOST17C0B2DD:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: POST
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri:
+          Fn::Join:
+            - ""
+            - - arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/
+              - Fn::GetAtt:
+                  - IngestionFn233E043F
+                  - Arn
+              - /invocations
+      ResourceId:
+        Ref: FlowSyncApiapiv1projects0A77EEE0
+      RestApiId:
+        Ref: FlowSyncApi8B5EDC74
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/api/v1/projects/POST/Resource
+  FlowSyncApiapiv1projectsprojectId89B4976C:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId:
+        Ref: FlowSyncApiapiv1projects0A77EEE0
+      PathPart: "{projectId}"
+      RestApiId:
+        Ref: FlowSyncApi8B5EDC74
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/api/v1/projects/{projectId}/Resource
+  FlowSyncApiapiv1projectsprojectIdOPTIONS4598F52E:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ApiKeyRequired: false
+      AuthorizationType: NONE
+      HttpMethod: OPTIONS
+      Integration:
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
+            StatusCode: "204"
+        RequestTemplates:
+          application/json: "{ statusCode: 200 }"
+        Type: MOCK
+      MethodResponses:
+        - ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Methods: true
+          StatusCode: "204"
+      ResourceId:
+        Ref: FlowSyncApiapiv1projectsprojectId89B4976C
+      RestApiId:
+        Ref: FlowSyncApi8B5EDC74
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/api/v1/projects/{projectId}/OPTIONS/Resource
+  FlowSyncApiapiv1projectsprojectIdGETApiPermissionFlowSyncStackFlowSyncApi7A767D5FGETapiv1projectsprojectId10885EC5:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::GetAtt:
+          - IngestionFn233E043F
+          - Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Join:
+          - ""
+          - - "arn:aws:execute-api:us-east-1:"
+            - Ref: AWS::AccountId
+            - ":"
+            - Ref: FlowSyncApi8B5EDC74
+            - /
+            - Ref: FlowSyncApiDeploymentStageprod623554D2
+            - /GET/api/v1/projects/*
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/api/v1/projects/{projectId}/GET/ApiPermission.FlowSyncStackFlowSyncApi7A767D5F.GET..api.v1.projects.{projectId}
+  FlowSyncApiapiv1projectsprojectIdGETApiPermissionTestFlowSyncStackFlowSyncApi7A767D5FGETapiv1projectsprojectIdAA4DEBA9:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::GetAtt:
+          - IngestionFn233E043F
+          - Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Join:
+          - ""
+          - - "arn:aws:execute-api:us-east-1:"
+            - Ref: AWS::AccountId
+            - ":"
+            - Ref: FlowSyncApi8B5EDC74
+            - /test-invoke-stage/GET/api/v1/projects/*
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/api/v1/projects/{projectId}/GET/ApiPermission.Test.FlowSyncStackFlowSyncApi7A767D5F.GET..api.v1.projects.{projectId}
+  FlowSyncApiapiv1projectsprojectIdGET286BB33E:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: GET
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri:
+          Fn::Join:
+            - ""
+            - - arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/
+              - Fn::GetAtt:
+                  - IngestionFn233E043F
+                  - Arn
+              - /invocations
+      ResourceId:
+        Ref: FlowSyncApiapiv1projectsprojectId89B4976C
+      RestApiId:
+        Ref: FlowSyncApi8B5EDC74
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/api/v1/projects/{projectId}/GET/Resource
+  FlowSyncApiapiv1projectsprojectIdeventsE5932858:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId:
+        Ref: FlowSyncApiapiv1projectsprojectId89B4976C
+      PathPart: events
+      RestApiId:
+        Ref: FlowSyncApi8B5EDC74
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/api/v1/projects/{projectId}/events/Resource
+  FlowSyncApiapiv1projectsprojectIdeventsOPTIONSF8A893C9:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ApiKeyRequired: false
+      AuthorizationType: NONE
+      HttpMethod: OPTIONS
+      Integration:
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
+            StatusCode: "204"
+        RequestTemplates:
+          application/json: "{ statusCode: 200 }"
+        Type: MOCK
+      MethodResponses:
+        - ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Methods: true
+          StatusCode: "204"
+      ResourceId:
+        Ref: FlowSyncApiapiv1projectsprojectIdeventsE5932858
+      RestApiId:
+        Ref: FlowSyncApi8B5EDC74
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/api/v1/projects/{projectId}/events/OPTIONS/Resource
+  FlowSyncApiapiv1projectsprojectIdeventsGETApiPermissionFlowSyncStackFlowSyncApi7A767D5FGETapiv1projectsprojectIdevents0D3F28D5:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::GetAtt:
+          - QueryFnB2E9AD3D
+          - Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Join:
+          - ""
+          - - "arn:aws:execute-api:us-east-1:"
+            - Ref: AWS::AccountId
+            - ":"
+            - Ref: FlowSyncApi8B5EDC74
+            - /
+            - Ref: FlowSyncApiDeploymentStageprod623554D2
+            - /GET/api/v1/projects/*/events
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/api/v1/projects/{projectId}/events/GET/ApiPermission.FlowSyncStackFlowSyncApi7A767D5F.GET..api.v1.projects.{projectId}.events
+  FlowSyncApiapiv1projectsprojectIdeventsGETApiPermissionTestFlowSyncStackFlowSyncApi7A767D5FGETapiv1projectsprojectIdeventsA5C197AF:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::GetAtt:
+          - QueryFnB2E9AD3D
+          - Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Join:
+          - ""
+          - - "arn:aws:execute-api:us-east-1:"
+            - Ref: AWS::AccountId
+            - ":"
+            - Ref: FlowSyncApi8B5EDC74
+            - /test-invoke-stage/GET/api/v1/projects/*/events
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/api/v1/projects/{projectId}/events/GET/ApiPermission.Test.FlowSyncStackFlowSyncApi7A767D5F.GET..api.v1.projects.{projectId}.events
+  FlowSyncApiapiv1projectsprojectIdeventsGETF30FEC0C:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: GET
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri:
+          Fn::Join:
+            - ""
+            - - arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/
+              - Fn::GetAtt:
+                  - QueryFnB2E9AD3D
+                  - Arn
+              - /invocations
+      ResourceId:
+        Ref: FlowSyncApiapiv1projectsprojectIdeventsE5932858
+      RestApiId:
+        Ref: FlowSyncApi8B5EDC74
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/api/v1/projects/{projectId}/events/GET/Resource
+  FlowSyncApiapiv1query64A60190:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId:
+        Ref: FlowSyncApiapiv15FABA006
+      PathPart: query
+      RestApiId:
+        Ref: FlowSyncApi8B5EDC74
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/api/v1/query/Resource
+  FlowSyncApiapiv1queryOPTIONSC04AF1FD:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ApiKeyRequired: false
+      AuthorizationType: NONE
+      HttpMethod: OPTIONS
+      Integration:
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
+            StatusCode: "204"
+        RequestTemplates:
+          application/json: "{ statusCode: 200 }"
+        Type: MOCK
+      MethodResponses:
+        - ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Methods: true
+          StatusCode: "204"
+      ResourceId:
+        Ref: FlowSyncApiapiv1query64A60190
+      RestApiId:
+        Ref: FlowSyncApi8B5EDC74
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/api/v1/query/OPTIONS/Resource
+  FlowSyncApiapiv1queryPOSTApiPermissionFlowSyncStackFlowSyncApi7A767D5FPOSTapiv1query78C5B562:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::GetAtt:
+          - QueryFnB2E9AD3D
+          - Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Join:
+          - ""
+          - - "arn:aws:execute-api:us-east-1:"
+            - Ref: AWS::AccountId
+            - ":"
+            - Ref: FlowSyncApi8B5EDC74
+            - /
+            - Ref: FlowSyncApiDeploymentStageprod623554D2
+            - /POST/api/v1/query
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/api/v1/query/POST/ApiPermission.FlowSyncStackFlowSyncApi7A767D5F.POST..api.v1.query
+  FlowSyncApiapiv1queryPOSTApiPermissionTestFlowSyncStackFlowSyncApi7A767D5FPOSTapiv1query0B428B6D:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::GetAtt:
+          - QueryFnB2E9AD3D
+          - Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Join:
+          - ""
+          - - "arn:aws:execute-api:us-east-1:"
+            - Ref: AWS::AccountId
+            - ":"
+            - Ref: FlowSyncApi8B5EDC74
+            - /test-invoke-stage/POST/api/v1/query
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/api/v1/query/POST/ApiPermission.Test.FlowSyncStackFlowSyncApi7A767D5F.POST..api.v1.query
+  FlowSyncApiapiv1queryPOSTEA923A72:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: POST
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri:
+          Fn::Join:
+            - ""
+            - - arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/
+              - Fn::GetAtt:
+                  - QueryFnB2E9AD3D
+                  - Arn
+              - /invocations
+      ResourceId:
+        Ref: FlowSyncApiapiv1query64A60190
+      RestApiId:
+        Ref: FlowSyncApi8B5EDC74
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/api/v1/query/POST/Resource
+  FlowSyncApiapiv1chat56E1CE42:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId:
+        Ref: FlowSyncApiapiv15FABA006
+      PathPart: chat
+      RestApiId:
+        Ref: FlowSyncApi8B5EDC74
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/api/v1/chat/Resource
+  FlowSyncApiapiv1chatOPTIONSA10E9653:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ApiKeyRequired: false
+      AuthorizationType: NONE
+      HttpMethod: OPTIONS
+      Integration:
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
+            StatusCode: "204"
+        RequestTemplates:
+          application/json: "{ statusCode: 200 }"
+        Type: MOCK
+      MethodResponses:
+        - ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Methods: true
+          StatusCode: "204"
+      ResourceId:
+        Ref: FlowSyncApiapiv1chat56E1CE42
+      RestApiId:
+        Ref: FlowSyncApi8B5EDC74
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/api/v1/chat/OPTIONS/Resource
+  FlowSyncApiapiv1chatPOSTApiPermissionFlowSyncStackFlowSyncApi7A767D5FPOSTapiv1chatD00B4C31:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::GetAtt:
+          - ChatFn5A5B3E47
+          - Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Join:
+          - ""
+          - - "arn:aws:execute-api:us-east-1:"
+            - Ref: AWS::AccountId
+            - ":"
+            - Ref: FlowSyncApi8B5EDC74
+            - /
+            - Ref: FlowSyncApiDeploymentStageprod623554D2
+            - /POST/api/v1/chat
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/api/v1/chat/POST/ApiPermission.FlowSyncStackFlowSyncApi7A767D5F.POST..api.v1.chat
+  FlowSyncApiapiv1chatPOSTApiPermissionTestFlowSyncStackFlowSyncApi7A767D5FPOSTapiv1chatFC9F1F76:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::GetAtt:
+          - ChatFn5A5B3E47
+          - Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Join:
+          - ""
+          - - "arn:aws:execute-api:us-east-1:"
+            - Ref: AWS::AccountId
+            - ":"
+            - Ref: FlowSyncApi8B5EDC74
+            - /test-invoke-stage/POST/api/v1/chat
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/api/v1/chat/POST/ApiPermission.Test.FlowSyncStackFlowSyncApi7A767D5F.POST..api.v1.chat
+  FlowSyncApiapiv1chatPOST964D3207:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: POST
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri:
+          Fn::Join:
+            - ""
+            - - arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/
+              - Fn::GetAtt:
+                  - ChatFn5A5B3E47
+                  - Arn
+              - /invocations
+      ResourceId:
+        Ref: FlowSyncApiapiv1chat56E1CE42
+      RestApiId:
+        Ref: FlowSyncApi8B5EDC74
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/api/v1/chat/POST/Resource
+  FlowSyncApimcp78622468:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId:
+        Fn::GetAtt:
+          - FlowSyncApi8B5EDC74
+          - RootResourceId
+      PathPart: mcp
+      RestApiId:
+        Ref: FlowSyncApi8B5EDC74
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/mcp/Resource
+  FlowSyncApimcpOPTIONS852BEF16:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ApiKeyRequired: false
+      AuthorizationType: NONE
+      HttpMethod: OPTIONS
+      Integration:
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
+            StatusCode: "204"
+        RequestTemplates:
+          application/json: "{ statusCode: 200 }"
+        Type: MOCK
+      MethodResponses:
+        - ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Methods: true
+          StatusCode: "204"
+      ResourceId:
+        Ref: FlowSyncApimcp78622468
+      RestApiId:
+        Ref: FlowSyncApi8B5EDC74
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/mcp/OPTIONS/Resource
+  FlowSyncApimcpPOSTApiPermissionFlowSyncStackFlowSyncApi7A767D5FPOSTmcpF0506225:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::GetAtt:
+          - McpFnFE65A12E
+          - Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Join:
+          - ""
+          - - "arn:aws:execute-api:us-east-1:"
+            - Ref: AWS::AccountId
+            - ":"
+            - Ref: FlowSyncApi8B5EDC74
+            - /
+            - Ref: FlowSyncApiDeploymentStageprod623554D2
+            - /POST/mcp
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/mcp/POST/ApiPermission.FlowSyncStackFlowSyncApi7A767D5F.POST..mcp
+  FlowSyncApimcpPOSTApiPermissionTestFlowSyncStackFlowSyncApi7A767D5FPOSTmcpCB3C2729:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::GetAtt:
+          - McpFnFE65A12E
+          - Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Join:
+          - ""
+          - - "arn:aws:execute-api:us-east-1:"
+            - Ref: AWS::AccountId
+            - ":"
+            - Ref: FlowSyncApi8B5EDC74
+            - /test-invoke-stage/POST/mcp
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/mcp/POST/ApiPermission.Test.FlowSyncStackFlowSyncApi7A767D5F.POST..mcp
+  FlowSyncApimcpPOST32252394:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: POST
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri:
+          Fn::Join:
+            - ""
+            - - arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/
+              - Fn::GetAtt:
+                  - McpFnFE65A12E
+                  - Arn
+              - /invocations
+      ResourceId:
+        Ref: FlowSyncApimcp78622468
+      RestApiId:
+        Ref: FlowSyncApi8B5EDC74
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/mcp/POST/Resource
+  FlowSyncApiwebhooks58390542:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId:
+        Fn::GetAtt:
+          - FlowSyncApi8B5EDC74
+          - RootResourceId
+      PathPart: webhooks
+      RestApiId:
+        Ref: FlowSyncApi8B5EDC74
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/webhooks/Resource
+  FlowSyncApiwebhooksOPTIONS91515850:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ApiKeyRequired: false
+      AuthorizationType: NONE
+      HttpMethod: OPTIONS
+      Integration:
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
+            StatusCode: "204"
+        RequestTemplates:
+          application/json: "{ statusCode: 200 }"
+        Type: MOCK
+      MethodResponses:
+        - ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Methods: true
+          StatusCode: "204"
+      ResourceId:
+        Ref: FlowSyncApiwebhooks58390542
+      RestApiId:
+        Ref: FlowSyncApi8B5EDC74
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/webhooks/OPTIONS/Resource
+  FlowSyncApiwebhooksgithubD05671F4:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId:
+        Ref: FlowSyncApiwebhooks58390542
+      PathPart: github
+      RestApiId:
+        Ref: FlowSyncApi8B5EDC74
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/webhooks/github/Resource
+  FlowSyncApiwebhooksgithubOPTIONS3DFEA51A:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ApiKeyRequired: false
+      AuthorizationType: NONE
+      HttpMethod: OPTIONS
+      Integration:
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
+            StatusCode: "204"
+        RequestTemplates:
+          application/json: "{ statusCode: 200 }"
+        Type: MOCK
+      MethodResponses:
+        - ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Methods: true
+          StatusCode: "204"
+      ResourceId:
+        Ref: FlowSyncApiwebhooksgithubD05671F4
+      RestApiId:
+        Ref: FlowSyncApi8B5EDC74
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/webhooks/github/OPTIONS/Resource
+  FlowSyncApiwebhooksgithubPOSTApiPermissionFlowSyncStackFlowSyncApi7A767D5FPOSTwebhooksgithub3113B423:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::GetAtt:
+          - IngestionFn233E043F
+          - Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Join:
+          - ""
+          - - "arn:aws:execute-api:us-east-1:"
+            - Ref: AWS::AccountId
+            - ":"
+            - Ref: FlowSyncApi8B5EDC74
+            - /
+            - Ref: FlowSyncApiDeploymentStageprod623554D2
+            - /POST/webhooks/github
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/webhooks/github/POST/ApiPermission.FlowSyncStackFlowSyncApi7A767D5F.POST..webhooks.github
+  FlowSyncApiwebhooksgithubPOSTApiPermissionTestFlowSyncStackFlowSyncApi7A767D5FPOSTwebhooksgithub59F95B78:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::GetAtt:
+          - IngestionFn233E043F
+          - Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Join:
+          - ""
+          - - "arn:aws:execute-api:us-east-1:"
+            - Ref: AWS::AccountId
+            - ":"
+            - Ref: FlowSyncApi8B5EDC74
+            - /test-invoke-stage/POST/webhooks/github
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/webhooks/github/POST/ApiPermission.Test.FlowSyncStackFlowSyncApi7A767D5F.POST..webhooks.github
+  FlowSyncApiwebhooksgithubPOST5E177776:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: POST
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri:
+          Fn::Join:
+            - ""
+            - - arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/
+              - Fn::GetAtt:
+                  - IngestionFn233E043F
+                  - Arn
+              - /invocations
+      ResourceId:
+        Ref: FlowSyncApiwebhooksgithubD05671F4
+      RestApiId:
+        Ref: FlowSyncApi8B5EDC74
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncApi/Default/webhooks/github/POST/Resource
+  FlowSyncAlarmsC6620C8C:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: FlowSync Operational Alarms
+      TopicName: flowsync-alarms
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncAlarms/Resource
+  HighQueueBacklogD4E9146A:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmActions:
+        - Ref: FlowSyncAlarmsC6620C8C
+      AlarmDescription: Processing queue has >100 visible messages for 10 minutes
+      AlarmName: flowsync-high-queue-backlog
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: QueueName
+          Value:
+            Fn::GetAtt:
+              - FlowSyncProcessingQueueC75EF78F
+              - QueueName
+      EvaluationPeriods: 2
+      MetricName: ApproximateNumberOfMessagesVisible
+      Namespace: AWS/SQS
+      Period: 300
+      Statistic: Average
+      Threshold: 100
+      TreatMissingData: notBreaching
+    Metadata:
+      aws:cdk:path: FlowSyncStack/HighQueueBacklog/Resource
+  HighQueueAgeF9D1FC72:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmActions:
+        - Ref: FlowSyncAlarmsC6620C8C
+      AlarmDescription: Oldest message in queue exceeds visibility timeout (90s)
+      AlarmName: flowsync-high-queue-age
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: QueueName
+          Value:
+            Fn::GetAtt:
+              - FlowSyncProcessingQueueC75EF78F
+              - QueueName
+      EvaluationPeriods: 1
+      MetricName: ApproximateAgeOfOldestMessage
+      Namespace: AWS/SQS
+      Period: 300
+      Statistic: Maximum
+      Threshold: 90000
+      TreatMissingData: notBreaching
+    Metadata:
+      aws:cdk:path: FlowSyncStack/HighQueueAge/Resource
+  DLQHasMessages481A302E:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmActions:
+        - Ref: FlowSyncAlarmsC6620C8C
+      AlarmDescription: Dead letter queue has messages requiring investigation
+      AlarmName: flowsync-dlq-has-messages
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: QueueName
+          Value:
+            Fn::GetAtt:
+              - FlowSyncDLQAAC41B11
+              - QueueName
+      EvaluationPeriods: 1
+      MetricName: ApproximateNumberOfMessagesVisible
+      Namespace: AWS/SQS
+      Period: 300
+      Statistic: Maximum
+      Threshold: 0
+      TreatMissingData: notBreaching
+    Metadata:
+      aws:cdk:path: FlowSyncStack/DLQHasMessages/Resource
+  AIProcessingErrors439F0BC4:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmActions:
+        - Ref: FlowSyncAlarmsC6620C8C
+      AlarmDescription: AI Processing Lambda error rate > 5% over 5 minutes
+      AlarmName: flowsync-ai-processing-errors
+      ComparisonOperator: GreaterThanThreshold
+      EvaluationPeriods: 2
+      Metrics:
+        - Expression: errors / invocations * 100
+          Id: expr_1
+          ReturnData: true
+        - Id: errors
+          MetricStat:
+            Metric:
+              Dimensions:
+                - Name: FunctionName
+                  Value:
+                    Ref: AiProcessingFn60BE2B85
+              MetricName: Errors
+              Namespace: AWS/Lambda
+            Period: 300
+            Stat: Sum
+          ReturnData: false
+        - Id: invocations
+          MetricStat:
+            Metric:
+              Dimensions:
+                - Name: FunctionName
+                  Value:
+                    Ref: AiProcessingFn60BE2B85
+              MetricName: Invocations
+              Namespace: AWS/Lambda
+            Period: 300
+            Stat: Sum
+          ReturnData: false
+      Threshold: 5
+      TreatMissingData: notBreaching
+    Metadata:
+      aws:cdk:path: FlowSyncStack/AIProcessingErrors/Resource
+  AIProcessingThrottles7F3C8A38:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmActions:
+        - Ref: FlowSyncAlarmsC6620C8C
+      AlarmDescription: AI Processing Lambda throttled
+      AlarmName: flowsync-ai-processing-throttles
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Dimensions:
+        - Name: FunctionName
+          Value:
+            Ref: AiProcessingFn60BE2B85
+      EvaluationPeriods: 1
+      MetricName: Throttles
+      Namespace: AWS/Lambda
+      Period: 300
+      Statistic: Sum
+      Threshold: 1
+      TreatMissingData: notBreaching
+    Metadata:
+      aws:cdk:path: FlowSyncStack/AIProcessingThrottles/Resource
+  AIProcessingHighLatency1FD2A0CC:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmActions:
+        - Ref: FlowSyncAlarmsC6620C8C
+      AlarmDescription: AI Processing Lambda p50 latency > 30s
+      AlarmName: flowsync-ai-processing-high-latency
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: FunctionName
+          Value:
+            Ref: AiProcessingFn60BE2B85
+      EvaluationPeriods: 3
+      MetricName: Duration
+      Namespace: AWS/Lambda
+      Period: 300
+      Statistic: Average
+      Threshold: 30000
+      TreatMissingData: notBreaching
+    Metadata:
+      aws:cdk:path: FlowSyncStack/AIProcessingHighLatency/Resource
+  IngestionErrorsD4F11E62:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmActions:
+        - Ref: FlowSyncAlarmsC6620C8C
+      AlarmDescription: Ingestion Lambda error rate > 1% over 5 minutes
+      AlarmName: flowsync-ingestion-errors
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: FunctionName
+          Value:
+            Ref: IngestionFn233E043F
+      EvaluationPeriods: 2
+      MetricName: Errors
+      Namespace: AWS/Lambda
+      Period: 300
+      Statistic: Sum
+      Threshold: 5
+      TreatMissingData: notBreaching
+    Metadata:
+      aws:cdk:path: FlowSyncStack/IngestionErrors/Resource
+  FlowSyncDashboardCE37041B:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardBody:
+        Fn::Join:
+          - ""
+          - - '{"widgets":[{"type":"metric","width":12,"height":6,"x":0,"y":0,"properties":{"view":"timeSeries","title":"Queue Health","region":"'
+            - Ref: AWS::Region
+            - '","metrics":[["AWS/SQS","ApproximateNumberOfMessagesVisible","QueueName","'
+            - Fn::GetAtt:
+                - FlowSyncProcessingQueueC75EF78F
+                - QueueName
+            - '"],["AWS/SQS","ApproximateNumberOfMessagesNotVisible","QueueName","'
+            - Fn::GetAtt:
+                - FlowSyncProcessingQueueC75EF78F
+                - QueueName
+            - '"],["AWS/SQS","ApproximateAgeOfOldestMessage","QueueName","'
+            - Fn::GetAtt:
+                - FlowSyncProcessingQueueC75EF78F
+                - QueueName
+            - '",{"stat":"Maximum","yAxis":"right"}]],"yAxis":{}}},{"type":"metric","width":12,"height":6,"x":12,"y":0,"properties":{"view":"timeSeries","title":"DLQ Messages","region":"'
+            - Ref: AWS::Region
+            - '","metrics":[["AWS/SQS","ApproximateNumberOfMessagesVisible","QueueName","'
+            - Fn::GetAtt:
+                - FlowSyncDLQAAC41B11
+                - QueueName
+            - '",{"stat":"Maximum"}]],"yAxis":{}}},{"type":"metric","width":12,"height":6,"x":0,"y":6,"properties":{"view":"timeSeries","title":"AI Processing Lambda","region":"'
+            - Ref: AWS::Region
+            - '","metrics":[["AWS/Lambda","Invocations","FunctionName","'
+            - Ref: AiProcessingFn60BE2B85
+            - '",{"stat":"Sum"}],["AWS/Lambda","Errors","FunctionName","'
+            - Ref: AiProcessingFn60BE2B85
+            - '",{"stat":"Sum"}],["AWS/Lambda","Duration","FunctionName","'
+            - Ref: AiProcessingFn60BE2B85
+            - '",{"yAxis":"right"}],["AWS/Lambda","Throttles","FunctionName","'
+            - Ref: AiProcessingFn60BE2B85
+            - '",{"stat":"Sum","yAxis":"right"}]],"yAxis":{}}},{"type":"metric","width":12,"height":6,"x":12,"y":6,"properties":{"view":"timeSeries","title":"Ingestion Lambda","region":"'
+            - Ref: AWS::Region
+            - '","metrics":[["AWS/Lambda","Errors","FunctionName","'
+            - Ref: IngestionFn233E043F
+            - '",{"stat":"Sum"}]],"yAxis":{}}}]}'
+      DashboardName: FlowSync-Operational
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncDashboard/Resource
+  FlowSyncFrontendC5DD64CC:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName:
+        Fn::Join:
+          - ""
+          - - flowsync-frontend-
+            - Ref: AWS::AccountId
+            - -us-east-1
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: aws-cdk:auto-delete-objects
+          Value: "true"
+        - Key: aws-cdk:cr-owned:c4b10ed5
+          Value: "true"
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncFrontend/Resource
+  FlowSyncFrontendPolicy35FEA426:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket:
+        Ref: FlowSyncFrontendC5DD64CC
+      PolicyDocument:
+        Statement:
+          - Action:
+              - s3:DeleteObject*
+              - s3:GetBucket*
+              - s3:List*
+              - s3:PutBucketPolicy
+            Effect: Allow
+            Principal:
+              AWS:
+                Fn::GetAtt:
+                  - CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092
+                  - Arn
+            Resource:
+              - Fn::GetAtt:
+                  - FlowSyncFrontendC5DD64CC
+                  - Arn
+              - Fn::Join:
+                  - ""
+                  - - Fn::GetAtt:
+                        - FlowSyncFrontendC5DD64CC
+                        - Arn
+                    - /*
+          - Action: s3:GetObject
+            Effect: Allow
+            Principal:
+              CanonicalUser:
+                Fn::GetAtt:
+                  - FlowSyncCFNOrigin1S3OriginE672E889
+                  - S3CanonicalUserId
+            Resource:
+              Fn::Join:
+                - ""
+                - - Fn::GetAtt:
+                      - FlowSyncFrontendC5DD64CC
+                      - Arn
+                  - /*
+          - Action: s3:GetObject
+            Condition:
+              StringEquals:
+                AWS:SourceArn:
+                  Fn::Join:
+                    - ""
+                    - - "arn:aws:cloudfront::"
+                      - Ref: AWS::AccountId
+                      - :distribution/
+                      - Ref: FlowSyncCFNB904BB4C
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Resource:
+              Fn::Join:
+                - ""
+                - - Fn::GetAtt:
+                      - FlowSyncFrontendC5DD64CC
+                      - Arn
+                  - /*
+        Version: "2012-10-17"
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncFrontend/Policy/Resource
+  FlowSyncFrontendAutoDeleteObjectsCustomResourceEADB962C:
+    Type: Custom::S3AutoDeleteObjects
+    Properties:
+      ServiceToken:
+        Fn::GetAtt:
+          - CustomS3AutoDeleteObjectsCustomResourceProviderHandler9D90184F
+          - Arn
+      BucketName:
+        Ref: FlowSyncFrontendC5DD64CC
+    DependsOn:
+      - FlowSyncFrontendPolicy35FEA426
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncFrontend/AutoDeleteObjectsCustomResource/Default
+  FrontendOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: flowsync-frontend-oac
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FrontendOAC
+  FlowSyncCFNOrigin1S3OriginE672E889:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: Identity for FlowSyncStackFlowSyncCFNOrigin1DF14FE69
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncCFN/Origin1/S3Origin/Resource
+  FlowSyncCFNB904BB4C:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+        DefaultCacheBehavior:
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          Compress: true
+          TargetOriginId: FlowSyncStackFlowSyncCFNOrigin1DF14FE69
+          ViewerProtocolPolicy: redirect-to-https
+        DefaultRootObject: index.html
+        Enabled: true
+        HttpVersion: http2
+        IPV6Enabled: true
+        Origins:
+          - DomainName:
+              Fn::GetAtt:
+                - FlowSyncFrontendC5DD64CC
+                - RegionalDomainName
+            Id: FlowSyncStackFlowSyncCFNOrigin1DF14FE69
+            OriginAccessControlId:
+              Fn::GetAtt:
+                - FrontendOAC
+                - Id
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FlowSyncCFN/Resource
+  FrontendDeployAwsCliLayer41881F6E:
+    Type: AWS::Lambda::LayerVersion
+    Properties:
+      Content:
+        S3Bucket:
+          Fn::Sub: cdk-hnb659fds-assets-${AWS::AccountId}-us-east-1
+        S3Key: 0cfdecad2260a3a84ad0c2d08a77e03c9d25e26c7b52f26b1e1faf97aef92f18.zip
+      Description: /opt/awscli/aws
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FrontendDeploy/AwsCliLayer/Resource
+      aws:asset:path: asset.0cfdecad2260a3a84ad0c2d08a77e03c9d25e26c7b52f26b1e1faf97aef92f18.zip
+      aws:asset:is-bundled: false
+      aws:asset:property: Content
+  FrontendDeployCustomResourceB137AB46:
+    Type: Custom::CDKBucketDeployment
+    Properties:
+      ServiceToken:
+        Fn::GetAtt:
+          - CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C81C01536
+          - Arn
+      SourceBucketNames:
+        - Fn::Sub: cdk-hnb659fds-assets-${AWS::AccountId}-us-east-1
+      SourceObjectKeys:
+        - d564829b815401b175d5ee1f42439c642255759b22c67b4390e352646cee5b3a.zip
+      DestinationBucketName:
+        Ref: FlowSyncFrontendC5DD64CC
+      WaitForDistributionInvalidation: true
+      Prune: true
+      DistributionId:
+        Ref: FlowSyncCFNB904BB4C
+      DistributionPaths:
+        - /*
+      OutputObjectKeys: true
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: FlowSyncStack/FrontendDeploy/CustomResource/Default
+  CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756CServiceRole89A01265:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+        Version: "2012-10-17"
+      ManagedPolicyArns:
+        - Fn::Join:
+            - ""
+            - - "arn:"
+              - Ref: AWS::Partition
+              - :iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+    Metadata:
+      aws:cdk:path: FlowSyncStack/Custom::CDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C/ServiceRole/Resource
+  CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756CServiceRoleDefaultPolicy88902FDF:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action:
+              - s3:GetBucket*
+              - s3:GetObject*
+              - s3:List*
+            Effect: Allow
+            Resource:
+              - Fn::Join:
+                  - ""
+                  - - "arn:aws:s3:::"
+                    - Fn::Sub: cdk-hnb659fds-assets-${AWS::AccountId}-us-east-1
+                    - /*
+              - Fn::Join:
+                  - ""
+                  - - "arn:aws:s3:::"
+                    - Fn::Sub: cdk-hnb659fds-assets-${AWS::AccountId}-us-east-1
+          - Action:
+              - s3:Abort*
+              - s3:DeleteObject*
+              - s3:GetBucket*
+              - s3:GetObject*
+              - s3:List*
+              - s3:PutObject
+              - s3:PutObjectLegalHold
+              - s3:PutObjectRetention
+              - s3:PutObjectTagging
+              - s3:PutObjectVersionTagging
+            Effect: Allow
+            Resource:
+              - Fn::GetAtt:
+                  - FlowSyncFrontendC5DD64CC
+                  - Arn
+              - Fn::Join:
+                  - ""
+                  - - Fn::GetAtt:
+                        - FlowSyncFrontendC5DD64CC
+                        - Arn
+                    - /*
+          - Action:
+              - cloudfront:CreateInvalidation
+              - cloudfront:GetInvalidation
+            Effect: Allow
+            Resource: "*"
+        Version: "2012-10-17"
+      PolicyName: CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756CServiceRoleDefaultPolicy88902FDF
+      Roles:
+        - Ref: CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756CServiceRole89A01265
+    Metadata:
+      aws:cdk:path: FlowSyncStack/Custom::CDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C/ServiceRole/DefaultPolicy/Resource
+  CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C81C01536:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket:
+          Fn::Sub: cdk-hnb659fds-assets-${AWS::AccountId}-us-east-1
+        S3Key: 3423a042b818e31c1e34a19d6689ab2e5f9b70fcbe9e71df66f241b20a200bd9.zip
+      Environment:
+        Variables:
+          AWS_CA_BUNDLE: /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
+      Handler: index.handler
+      Layers:
+        - Ref: FrontendDeployAwsCliLayer41881F6E
+      Role:
+        Fn::GetAtt:
+          - CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756CServiceRole89A01265
+          - Arn
+      Runtime: python3.13
+      Timeout: 900
+    DependsOn:
+      - CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756CServiceRoleDefaultPolicy88902FDF
+      - CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756CServiceRole89A01265
+    Metadata:
+      aws:cdk:path: FlowSyncStack/Custom::CDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C/Resource
+      aws:asset:path: asset.3423a042b818e31c1e34a19d6689ab2e5f9b70fcbe9e71df66f241b20a200bd9
+      aws:asset:is-bundled: false
+      aws:asset:property: Code
+  CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756CLogGroup817B64E9:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName:
+        Fn::Join:
+          - ""
+          - - /aws/lambda/
+            - Ref: CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C81C01536
+      RetentionInDays: 731
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Metadata:
+      aws:cdk:path: FlowSyncStack/Custom::CDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C/LogGroup/Resource
+  CDKMetadata:
+    Type: AWS::CDK::Metadata
+    Properties:
+      Analytics: v2:deflate64:H4sIAAAAAAAA/+1c3W/bOAz/W+bHg+vb9fZyfUvTbivWrlmS23AIioKxGEebLHkSncwz8r8fJNmx+7l1n+2mh8AyKVHUT6TNSKJ3k90nj5PHj2BtdlL2bkfweVJPCNJ3MazNec0qCbli86SewlzgrI7IXl9CjtFe9EcURwVo4sSVfIFVtFdHsmNRVdjiJNrE0ZwLwWV2opgljQb/nY8Ox+fjw1f/Hk6mURxpzNUKxEgJnlbRXsTQkFZVtIm/uEujNH0/pYCxZ0LNQUwwVZKBro4kww/R3qyOuC31FdbqLaZW46nvfXB8HG3OvqGYnzArvwQA39dGfvCsxBHxHKfqmK9wQKT5vCQvPyhzj5T5+VZ/DzS/X2ICjvdHzFk8XEgXbWxi83dS75fpO6RZHc1doSdhLlT6blTOBU8HaYrGNPSbnwJQkjpAgYSnc9u5ifZIl2hV/47S3Yj8MGJ/8Y23Y9o+ifq3vVa+etN2H4xF5r1J6lclljYme2+vPdU1EkqL7Ag1V6yhokx1VViytd9Xk/OTwcvBs8MD1/NlEStu+JwLTtWU56hKulW0xhT5Ck/QGMjwDXCyrRomQ2DHSITa6Wv96b0vOHYOH8a++VCVssXiFm0dME7UJhaQzxkk9TFUqF+jNlzJWR2J3m1vUKl3VF/MCyA+FzgupX05mK22JtW87bidh778+Gkpnd3O6mjRFPvge3nN3RIkE6ivKkAXYM0xV7qa8I+4nawV10rmKDvrAMYO++SZq/lHdPbwmAG3hwSqcyfjezt7OBgf99X+TQEKGNwVoE+M4zIOWgm88WFULDFHDWJCSkOGPdaqSLvSpJxLpPYNZDAtNafqmVZl0RIXXKCpDGHewq0yV+HqPF2cwP7k3h0P9/Jr33fx4QolTVSpUzyBouAycwtCOsMWjTlQuuwNM4cP+5bEZfaGS6bWHX2oZFpqjdJFUT6KKJQmV/+IMH8KXJQamyjKzoQNCrfRTKfLQMsOJXLa9+4O+4GEnybSPDVDJRc8673jr47OUkeoc27ce3/CZSaQlOwFAGXJ2ec5gK1gg5VRqQtlrneqB2hMJ0jAgKCxJDtVZ9ezvEHZoP68BmOQTDKwl5hhIVRlgUp8iHuwJWxiDnlSj5VbewRjyhzZvvtPVmguU16AGKTpNnCMmzq2wSDtgjhrcRIyZC6U5taoZvUFWtVa0fafzFSN2i7aYH9WN1wiSJdHUnCJW97WiW5l3i43cAP3e3CD4wRu4AanC04XuPeBG1wjcAM3uEbgBm5wjc8YvluhssOKPdmtqLSdTdXYLRxd0uEqmbEJAaFdWTEXug3kX5kcbCWQg2UFcjCKQA5GEcj3hvxzjMLF0j6M3sRCZSapj5sNUHt2rCluD0hYMT+G6I+aNeRNDAXPgHANVVKP0dCg4LM60r7UO7/BcAGloKHSZqRxIXi2pFO3423sPyUQQq1PNc+4bDeAHekEaanYBdJzBNbun2+a/xy+u7jbk53VVw7JxREUvDshCFx21U1/t3iqjlXGUxBH7NLfnkAP9F+B7pyms/54QpChc5mW1PN1x4zHaNypE3uy1x8e8a7pnd2x2tMYRIXnNQQuCTMNPUdUPccvaak0/2iPb/TvjtrWLQl6p7DdagkU/AVWY3xfcm1P3CxAGLypvjtRs1RsjKZQ0jSLK4aASjPsTpLohj0CDTluj+lszjYNlicXpNxVSBzACmAFsB42WE2gEOAOcAe4A9wB7gB3gDvAHeD+3eAOYN3RNt1ygm+wXU+Y1TaRvcs/KYCWI9BdPlbgfia3XQl1sG5iI01ST1XBU5v/ZK/91VhuCgHVpVVdV3sTp0KVbG0znJJ6IEDnNqvFXnsC3P3BlRVWn7ZknWENWnKZtSu37e3r3dYDaKnRLJXocqVAlNBlbbctXRK05kbJ0wI1kGrzfEgj0IlNe5LZgcvgiaSifY3gUrna1Vw3gvaczXZVLAwnDCcMJwzn1xqOe4o7cnwAZjlXoO0CPWvLvWGuOctcBuZsVtsbWrYvdbRbc5cGd9NYv7zpWfyT+m13Rd5sAfgKPXr7vd9Ont+daeeseR8vtJKU1MOF9Luk/nMvQyVJKxEfcOM/GOUTfpvN1n1cwoorF5wq16rpd8VxjXqkFalUdV+J0ci4xpR2SO3Y2M5YI4V0uT0i6nVspI+VIv8NmdbOtVb6YoxqpUxciHkpvHx+E2MEGY6gQc9C+7UiLJ59yI6Y/TYMVdZhLNBDi+5Ti+51tdxU9MDdbLrI1XX66d9ZPCwNqfy6dhditkv1RlqtOENtd9xil4Rsd+KajO/TkoqSmk/LnLus7nNYm1TwZLA2Q8Fdirx/xknFMHlr/lztPkn++id5/Oit4XynSZNOmk/L/A/kJcARZVEAAA==
+    Metadata:
+      aws:cdk:path: FlowSyncStack/CDKMetadata/Default
+Outputs:
+  FlowSyncApiEndpoint80A3B5FC:
+    Value:
+      Fn::Join:
+        - ""
+        - - https://
+          - Ref: FlowSyncApi8B5EDC74
+          - .execute-api.us-east-1.
+          - Ref: AWS::URLSuffix
+          - /
+          - Ref: FlowSyncApiDeploymentStageprod623554D2
+          - /
+  ApiUrl:
+    Description: API Gateway base URL ΓÇö share with team
+    Value:
+      Fn::Join:
+        - ""
+        - - https://
+          - Ref: FlowSyncApi8B5EDC74
+          - .execute-api.us-east-1.
+          - Ref: AWS::URLSuffix
+          - /
+          - Ref: FlowSyncApiDeploymentStageprod623554D2
+          - /
+  RawEventsBucket:
+    Value:
+      Ref: FlowSyncRawEvents34E574F1
+  ProcessingQueueUrl:
+    Description: SQS queue URL for event processing
+    Value:
+      Ref: FlowSyncProcessingQueueC75EF78F
+  DLQUrl:
+    Description: Dead Letter Queue URL for failed event processing
+    Value:
+      Ref: FlowSyncDLQAAC41B11
+  FrontendUrl:
+    Description: CloudFront URL for FlowSync frontend
+    Value:
+      Fn::Join:
+        - ""
+        - - https://
+          - Fn::GetAtt:
+              - FlowSyncCFNB904BB4C
+              - DomainName
+Parameters:
+  BootstrapVersion:
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /cdk-bootstrap/hnb659fds/version
+    Description: Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]
+

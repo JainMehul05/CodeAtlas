@@ -30,8 +30,25 @@ cloudwatch = boto3.client("cloudwatch")
 # Idempotency TTL (7 days in seconds)
 IDEMPOTENCY_TTL_SECONDS = 7 * 24 * 60 * 60
 
+# Stale processing lease threshold (10 minutes)
+STALE_PROCESSING_THRESHOLD_SECONDS = 10 * 60
+
+# Failed record retry delay (1 hour) - allows manual intervention or automatic retry
+FAILED_RETRY_DELAY_SECONDS = 60 * 60
+
 # Graph schema version
 GRAPH_SCHEMA_VERSION = "1"
+
+def utcnow_iso() -> str:
+    """Get current UTC time as ISO format string with Z suffix."""
+    return datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+
+def parse_iso_datetime(dt_str: str) -> datetime:
+    """Parse ISO datetime string to timezone-aware datetime."""
+    # Handle both 'Z' and '+00:00' formats
+    if dt_str.endswith('Z'):
+        dt_str = dt_str.replace('Z', '+00:00')
+    return datetime.fromisoformat(dt_str)
 
 def call_bedrock(event_data):
     """Call Nova Pro via Bedrock Converse API with commit metadata and return extracted context as JSON."""
@@ -239,7 +256,7 @@ def publish_cloudwatch_metric(metric_name, value, project_id):
                     'MetricName': metric_name,
                     'Value': value,
                     'Unit': 'Count',
-                    'Timestamp': datetime.utcnow(),
+                    'Timestamp': datetime.now(timezone.utc),
                     'Dimensions': [
                         {
                             'Name': 'ProjectId',
@@ -299,6 +316,7 @@ def check_idempotency(idempotency_key: str) -> tuple[bool, dict | None]:
     Check if an event has already been processed.
     Returns (is_duplicate, existing_record).
     Handles stale PROCESSING records by allowing reprocessing if older than lease threshold.
+    Allows retry of FAILED records after a delay.
     """
     table = dynamodb.Table(IDEMPOTENCY_TABLE)
     try:
@@ -306,21 +324,39 @@ def check_idempotency(idempotency_key: str) -> tuple[bool, dict | None]:
         item = response.get('Item')
         if item:
             status = item.get('status')
-            # Handle stale PROCESSING records: if PROCESSING for > 10 minutes, allow reprocessing
+            # Handle stale PROCESSING records: if PROCESSING for > threshold, allow reprocessing
             if status == 'PROCESSING':
                 started_at_str = item.get('startedAt')
                 if started_at_str:
                     try:
-                        started_at = datetime.fromisoformat(started_at_str.replace('Z', '+00:00'))
+                        started_at = parse_iso_datetime(started_at_str)
                         now = datetime.now(timezone.utc)
-                        if (now - started_at).total_seconds() > 600:  # 10 minute lease
+                        if (now - started_at).total_seconds() > STALE_PROCESSING_THRESHOLD_SECONDS:
                             print(f"[idempotency] Stale PROCESSING record detected for key: {idempotency_key}, allowing reprocessing")
                             return False, None
                     except Exception:
                         pass  # If parsing fails, treat as normal duplicate
-                print(f"[idempotency] Duplicate detected for key: {idempotency_key}")
+                print(f"[idempotency] Duplicate detected for key: {idempotency_key} (PROCESSING)")
                 return True, item
-            # For COMPLETED, FAILED, or any other final status, treat as duplicate
+            # For COMPLETED, treat as duplicate
+            if status == 'COMPLETED':
+                print(f"[idempotency] Duplicate detected for key: {idempotency_key} (COMPLETED)")
+                return True, item
+            # For FAILED, allow retry after delay
+            if status == 'FAILED':
+                failed_at_str = item.get('failedAt')
+                if failed_at_str:
+                    try:
+                        failed_at = parse_iso_datetime(failed_at_str)
+                        now = datetime.now(timezone.utc)
+                        if (now - failed_at).total_seconds() > FAILED_RETRY_DELAY_SECONDS:
+                            print(f"[idempotency] FAILED record older than retry delay, allowing retry for key: {idempotency_key}")
+                            return False, None
+                    except Exception:
+                        pass  # If parsing fails, don't allow retry
+                print(f"[idempotency] Duplicate detected for key: {idempotency_key} (FAILED, retry delay not elapsed)")
+                return True, item
+            # For any other status, treat as duplicate
             print(f"[idempotency] Duplicate detected for key: {idempotency_key} (status: {status})")
             return True, item
         return False, None
@@ -334,7 +370,7 @@ def claim_idempotency(idempotency_key: str, event_data: dict) -> bool:
     Returns True if claim succeeded, False if already claimed.
     """
     table = dynamodb.Table(IDEMPOTENCY_TABLE)
-    timestamp = datetime.utcnow().isoformat() + 'Z'
+    timestamp = utcnow_iso()
     expires_at = int(time.time()) + IDEMPOTENCY_TTL_SECONDS
     
     try:
@@ -366,7 +402,7 @@ def complete_idempotency(idempotency_key: str, result: dict):
             ExpressionAttributeNames={'#status': 'status'},
             ExpressionAttributeValues={
                 ':status': 'COMPLETED',
-                ':ts': datetime.utcnow().isoformat() + 'Z',
+                ':ts': utcnow_iso(),
                 ':result': result,
             }
         )
@@ -383,7 +419,7 @@ def fail_idempotency(idempotency_key: str, error: str):
             ExpressionAttributeNames={'#status': 'status'},
             ExpressionAttributeValues={
                 ':status': 'FAILED',
-                ':ts': datetime.utcnow().isoformat() + 'Z',
+                ':ts': utcnow_iso(),
                 ':error': error,
             }
         )
@@ -438,7 +474,7 @@ def get_graph_relationships_table():
 def upsert_graph_entity(entity: dict):
     """Upsert a graph entity with idempotent write."""
     table = get_graph_entities_table()
-    now = datetime.utcnow().isoformat() + 'Z'
+    now = utcnow_iso()
     entity = dict(entity)
     entity['schemaVersion'] = entity.get('schemaVersion', GRAPH_SCHEMA_VERSION)
     entity['updatedAt'] = now
@@ -466,7 +502,7 @@ def upsert_graph_entity(entity: dict):
 def upsert_graph_relationship(relationship: dict):
     """Upsert a graph relationship with conditional write for idempotency."""
     table = get_graph_relationships_table()
-    now = datetime.utcnow().isoformat() + 'Z'
+    now = utcnow_iso()
     relationship = dict(relationship)
     relationship['schemaVersion'] = relationship.get('schemaVersion', GRAPH_SCHEMA_VERSION)
     relationship['updatedAt'] = now
@@ -507,7 +543,7 @@ def ingest_graph_from_event(body: dict, correlation_id: str):
     event_type = body.get('eventType')
     branch = body.get('branch')
     payload = body.get('payload', {})
-    timestamp = body.get('timestamp', datetime.utcnow().isoformat() + 'Z')
+    timestamp = body.get('timestamp', utcnow_iso())
     delivery_id = body.get('deliveryId')
     
     if not project_id or not event_id:
@@ -1134,13 +1170,26 @@ def ingest_graph_from_event(body: dict, correlation_id: str):
 # STRUCTURED LOGGING WITH CORRELATION ID
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Common log fields that should be extracted from kwargs if present
+LOG_CONTEXT_FIELDS = {
+    'projectId', 'eventId', 'eventType', 'branch', 'deliveryId', 
+    'idempotencyKey', 'status', 'error', 'durationMs', 'attempt'
+}
+
 def log_structured(level: str, message: str, correlation_id: str = None, **kwargs):
-    """Log a structured JSON entry with correlation ID."""
+    """Log a structured JSON entry with correlation ID and standard context fields."""
+    # Extract standard context fields from kwargs
+    context = {}
+    for field in LOG_CONTEXT_FIELDS:
+        if field in kwargs:
+            context[field] = kwargs.pop(field)
+    
     entry = {
-        'timestamp': datetime.utcnow().isoformat() + 'Z',
+        'timestamp': utcnow_iso(),
         'level': level,
         'message': message,
         'correlationId': correlation_id,
+        **context,
         **kwargs,
     }
     print(json.dumps(entry))
@@ -1179,7 +1228,7 @@ def process_event_record(record: dict, correlation_id: str) -> dict:
     branch = body.get('branch')
     parent_branch = body.get('parentBranch')
     payload = body.get('payload', {})
-    timestamp = body.get('timestamp', datetime.utcnow().isoformat() + 'Z')
+    timestamp = body.get('timestamp', utcnow_iso())
     delivery_id = body.get('deliveryId')
     
     # Build idempotency key - use deliveryId for GitHub events, eventId otherwise
@@ -1233,7 +1282,7 @@ def process_event(event_data: dict, correlation_id: str) -> dict:
     event_id = event_data.get("eventId", "test-event")
     event_type = event_data.get("eventType")
     branch = event_data.get("branch", "main")
-    timestamp = event_data.get("timestamp", datetime.utcnow().isoformat() + "Z")
+    timestamp = event_data.get("timestamp", utcnow_iso())
     parent_branch = event_data.get("parentBranch")
     payload = event_data.get("payload", event_data)
     delivery_id = event_data.get("deliveryId")
@@ -1460,12 +1509,12 @@ def handler(event, context):
                 project_id = body.get('projectId', 'test-project')
                 source_branch = body.get('sourceBranch')
                 target_branch = body.get('targetBranch')
-                timestamp = body.get('timestamp', datetime.utcnow().isoformat() + 'Z')
+                timestamp = body.get('timestamp', utcnow_iso())
                 if not source_branch or not target_branch:
                     raise ValueError('sourceBranch and targetBranch required for propagation')
                 count = propagate_branch_context(project_id, source_branch, target_branch, timestamp)
                 update_project_activity(project_id, timestamp)
-                log_info(correlation_id, "Merge propagation completed", 
+                log_info(correlation_id, "Merge propagation completed",
                          count=count, fromBranch=source_branch, toBranch=target_branch)
                 continue
             
@@ -1473,12 +1522,12 @@ def handler(event, context):
             result = process_event_record(record, correlation_id)
             
             if result.get('status') == 'duplicate':
-                log_info(correlation_id, "Skipped duplicate event", 
+                log_info(correlation_id, "Skipped duplicate event",
                          eventId=result.get('eventId'))
             else:
-                log_info(correlation_id, "Event processed successfully", 
+                log_info(correlation_id, "Event processed successfully",
                          eventId=result.get('eventId'), status=result.get('status'))
-            
+        
         except Exception as e:
             log_error(correlation_id, "Failed to process record", e, messageId=record.get('messageId'))
             batch_item_failures.append({'itemIdentifier': record.get('messageId')})

@@ -4,6 +4,7 @@ import {
 import {
   DynamoDBDocumentClient,
   PutCommand,
+  GetCommand,
 } from '@aws-sdk/lib-dynamodb';
 import {
   S3Client,
@@ -163,6 +164,7 @@ const PROJECTS_TABLE = process.env.PROJECTS_TABLE;               // flowsync-pro
 const EVENTS_TABLE = process.env.EVENTS_TABLE;                 // flowsync-events
 const AUDIT_TABLE = process.env.AUDIT_TABLE;                   // flowsync-audit
 const RAW_EVENTS_BUCKET = process.env.RAW_EVENTS_BUCKET;       // flowsync-raw-events-{account}
+const PROJECT_REPO_MAPPING_TABLE = process.env.PROJECT_REPO_MAPPING_TABLE; // flowsync-project-repo-mapping
 
 function getProcessingQueueUrl() {
   return process.env.PROCESSING_QUEUE_URL;
@@ -222,6 +224,30 @@ export function getMockSqsSend() {
 
 export function clearMockSqsSend() {
   __mockSqsSend = null;
+}
+
+// ── Project-Repository Mapping ──────────────────────────────────────────────
+function getProjectRepoMappingTable(): string | undefined {
+  return process.env.PROJECT_REPO_MAPPING_TABLE;
+}
+
+async function getProjectIdFromRepository(repoFullName: string): Promise<string | null> {
+  const tableName = getProjectRepoMappingTable();
+  if (!tableName) {
+    console.error('[fatal] PROJECT_REPO_MAPPING_TABLE not configured');
+    return null;
+  }
+  const repositoryId = `github:${repoFullName.toLowerCase()}`;
+  try {
+    const result = await getDynamoClient().send(new GetCommand({
+      TableName: tableName,
+      Key: { repositoryId },
+    }));
+    return result.Item?.projectId ?? null;
+  } catch (err) {
+    console.error('[error] Failed to lookup project-repo mapping', { repositoryId, error: (err as Error).message });
+    return null;
+  }
 }
 
 // ── Correlation ID support ──────────────────────────────────────────────────
@@ -531,9 +557,11 @@ export async function handleGitHubWebhook(
     return respond(400, { error: 'missing_repository', message: 'Repository information missing from payload' }, correlationId);
   }
 
-  // TODO: Map GitHub repository to CodeAtlas project ID
-  // For now, we'll use a project ID from environment or derive from repo name
-  const projectId = process.env.DEFAULT_PROJECT_ID || `github-${repoFullName.replace('/', '-')}`;
+  // Look up project ID from repository mapping table
+  const projectId = await getProjectIdFromRepository(repoFullName);
+  if (!projectId) {
+    return respond(403, { error: 'project_not_found', message: `Repository ${repoFullName} is not mapped to a CodeAtlas project` }, correlationId);
+  }
 
   // Extract event data based on event type
   const eventId = githubDelivery; // Use GitHub delivery ID as event ID for idempotency
