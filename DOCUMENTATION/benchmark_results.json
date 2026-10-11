@@ -1,0 +1,175 @@
+{
+  "timestamp": "2026-10-11T03:40:38.748142+00:00",
+  "repetitions": 10,
+  "seed": 42,
+  "environment": "local-mocked",
+  "results": [
+    {
+      "name": "Graph Traversal - Small (10 entities, 15 rels, depth=2, maxResults=20)",
+      "error": "cannot import name 'query_knowledge_graph' from 'handler' (C:\\Users\\hp\\Desktop\\CodeAtlas\\DOCUMENTATION\\..\\infra\\lambda\\ai_processing\\handler.py)"
+    },
+    {
+      "name": "Graph Traversal - Medium (100 entities, 200 rels, depth=3, maxResults=50)",
+      "error": "cannot import name 'query_knowledge_graph' from 'handler' (C:\\Users\\hp\\Desktop\\CodeAtlas\\DOCUMENTATION\\..\\infra\\lambda\\ai_processing\\handler.py)"
+    },
+    {
+      "name": "Graph Traversal - Large (1000 entities, 3000 rels, depth=3, maxResults=50)",
+      "error": "cannot import name 'query_knowledge_graph' from 'handler' (C:\\Users\\hp\\Desktop\\CodeAtlas\\DOCUMENTATION\\..\\infra\\lambda\\ai_processing\\handler.py)"
+    },
+    {
+      "name": "Graph Query by Type - 500 entities, filter by type",
+      "error": "cannot import name 'query_knowledge_graph' from 'handler' (C:\\Users\\hp\\Desktop\\CodeAtlas\\DOCUMENTATION\\..\\infra\\lambda\\ai_processing\\handler.py)"
+    },
+    {
+      "name": "RAG Retrieval - Small (10 context records)",
+      "repetitions": 10,
+      "times_ms": [
+        14.820099999951708,
+        14.439600000059727,
+        11.907000000064727,
+        10.857199999918521,
+        16.49219999990237,
+        66.55490000002828,
+        13.056300000016563,
+        11.463099999900805,
+        14.808099999982005,
+        15.126499999951193
+      ],
+      "min_ms": 10.857199999918521,
+      "max_ms": 66.55490000002828,
+      "mean_ms": 18.95249999997759,
+      "median_ms": 14.623850000020866,
+      "stdev_ms": 16.823687416276602
+    },
+    {
+      "name": "RAG Retrieval - Medium (100 context records)",
+      "repetitions": 10,
+      "times_ms": [
+        91.14169999998012,
+        92.06650000010086,
+        91.96269999983997,
+        82.0094999999128,
+        99.8920999998063,
+        85.46200000000681,
+        79.74659999990763,
+        108.44539999993685,
+        90.93740000002981,
+        111.41279999992548
+      ],
+      "min_ms": 79.74659999990763,
+      "max_ms": 111.41279999992548,
+      "mean_ms": 93.30766999994466,
+      "median_ms": 91.55219999991004,
+      "stdev_ms": 10.472536443894747
+    },
+    {
+      "name": "RAG Retrieval - Large (500 context records, limited to 50)",
+      "repetitions": 10,
+      "times_ms": [
+        83.56460000004517,
+        73.976200000061,
+        70.00489999995807,
+        75.92789999989691,
+        60.53010000005088,
+        73.41050000013638,
+        60.803500000019994,
+        69.95099999994636,
+        79.86200000004828,
+        73.4495000001516
+      ],
+      "min_ms": 60.53010000005088,
+      "max_ms": 83.56460000004517,
+      "mean_ms": 72.14802000003147,
+      "median_ms": 73.43000000014399,
+      "stdev_ms": 7.332236937560495
+    },
+    {
+      "name": "RAG with Graph Context (50 records + 20 entities, 30 rels)",
+      "repetitions": 10,
+      "times_ms": [
+        50.853100000040286,
+        57.64709999994011,
+        45.29709999997067,
+        50.97180000007029,
+        47.27520000005825,
+        49.145700000053694,
+        63.44669999998587,
+        50.031300000000556,
+        52.847499999870706,
+        42.09990000003927
+      ],
+      "min_ms": 42.09990000003927,
+      "max_ms": 63.44669999998587,
+      "mean_ms": 50.96154000000297,
+      "median_ms": 50.44220000002042,
+      "stdev_ms": 6.078293897334479
+    },
+    {
+      "name": "Embedding Generation (3 texts: short/medium/long)",
+      "repetitions": 10,
+      "times_ms": [
+        5.5500999999367195,
+        3.867299999910756,
+        5.526999999801774,
+        3.491100000019287,
+        3.2764999998562416,
+        7.510400000001027,
+        4.229299999906289,
+        4.9165000000357395,
+        3.6248999999770604,
+        4.208500000004278
+      ],
+      "min_ms": 3.2764999998562416,
+      "max_ms": 7.510400000001027,
+      "mean_ms": 4.620159999944917,
+      "median_ms": 4.218899999955283,
+      "stdev_ms": 1.2947855534215547
+    },
+    {
+      "name": "Event Processing - Small Batch (5 events)",
+      "repetitions": 10,
+      "times_ms": [
+        8.426999999983309,
+        7.653300000129093,
+        7.047999999940657,
+        10.504800000035175,
+        14.836800000011863,
+        7.133900000098947,
+        10.131600000022445,
+        15.975399999888396,
+        9.603800000149931,
+        10.84949999994933
+      ],
+      "min_ms": 7.047999999940657,
+      "max_ms": 15.975399999888396,
+      "mean_ms": 10.216410000020915,
+      "median_ms": 9.867700000086188,
+      "stdev_ms": 3.067620067499972
+    },
+    {
+      "name": "Event Processing - Medium Batch (25 events)",
+      "repetitions": 10,
+      "times_ms": [
+        38.691799999924115,
+        32.56839999994554,
+        43.32590000012715,
+        28.87689999988652,
+        35.965999999916676,
+        24.735199999895485,
+        41.51589999992211,
+        38.058500000033746,
+        26.635699999815188,
+        41.80650000012065
+      ],
+      "min_ms": 24.735199999895485,
+      "max_ms": 43.32590000012715,
+      "mean_ms": 35.21807999995872,
+      "median_ms": 37.01224999997521,
+      "stdev_ms": 6.668999993379831
+    },
+    {
+      "name": "Idempotency Check (single check)",
+      "error": "check_idempotency() takes 1 positional argument but 3 were given"
+    }
+  ]
+}

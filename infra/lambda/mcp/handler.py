@@ -9,7 +9,7 @@ import json
 import boto3
 import os
 import base64
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from botocore.config import Config as BotoConfig
 from botocore.exceptions import ClientError
@@ -253,7 +253,7 @@ def log_context(params):
         })
     
     table = dynamodb.Table(CONTEXT_TABLE)
-    timestamp = datetime.utcnow().isoformat() + 'Z'
+    timestamp = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
     
     # Find existing complete record (same projectId, branch, author, within 30 min)
     time_obj = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
