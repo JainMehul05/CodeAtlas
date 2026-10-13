@@ -9,7 +9,7 @@
     "test": "jest"
   },
   "dependencies": {
-    "@aws-sdk/client-sqs": "^3.1148.0",
+    "@aws-sdk/client-sqs": "^3.1149.0",
     "@flowsync/shared": "file:../../../packages/flowsync-shared"
   },
   "devDependencies": {
